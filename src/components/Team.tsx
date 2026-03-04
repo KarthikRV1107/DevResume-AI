@@ -1,9 +1,10 @@
 import { motion } from "framer-motion";
 
 const members = [
-  { initials: "BW", name: "B. Williams", role: "ML Engineer" },
-  { initials: "WT", name: "W. Torres", role: "Full-Stack Dev" },
-  { initials: "TK", name: "T. Kim", role: "Product & UX" },
+  { initials: "KR", name: "Karthik R V", role: "ML Engineer" },
+  { initials: "CH", name: "Chaitra", role: "Full-Stack Dev" },
+  { initials: "AI", name: "Aishwarya", role: "Product & UX" },
+  { initials: "KE", name: "Keerthana", role: "Product & UX" },
 ];
 
 const Team = () => (
