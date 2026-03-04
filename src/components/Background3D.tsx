@@ -125,12 +125,12 @@ const FloatingGrid = () => {
 
 const Background3D = () => {
   return (
-    <div className="fixed inset-0 -z-10">
+    <div className="fixed inset-0" style={{ zIndex: -1 }}>
       <Canvas
         camera={{ position: [0, 0, 6], fov: 60 }}
         dpr={[1, 1.5]}
         gl={{ antialias: false, alpha: true }}
-        style={{ background: "transparent" }}
+        style={{ background: "hsl(220 20% 4%)" }}
       >
         <ParticleField />
         <FloatingGrid />
