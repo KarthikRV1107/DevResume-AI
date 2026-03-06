@@ -6,7 +6,7 @@ const Footer = () => (
       <div className="flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Terminal className="w-4 h-4 text-primary" />
-          <span className="font-mono">DevResume AI</span>
+          <span className="font-mono"><span className="text-foreground">DevResume</span> AI</span>
           <span className="text-border">|</span>
           <span>Built by BWT_Techies</span>
         </div>

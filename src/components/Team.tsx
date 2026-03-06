@@ -19,7 +19,7 @@ const Team = () => (
         <h2 className="text-3xl md:text-4xl font-bold mb-4">
           Built by <span className="text-gradient">BWT_Techies</span>
         </h2>
-        <p className="text-muted-foreground">The team behind DevResume AI.</p>
+        <p className="text-muted-foreground">The team behind <span className="text-foreground">DevResume</span> AI.</p>
       </motion.div>
 
       <div className="flex flex-wrap justify-center gap-8 md:gap-12">

@@ -24,7 +24,7 @@ const Pitch = () => (
           <span className="text-gradient">Hackathon Pitch</span>
         </h2>
         <p className="text-muted-foreground max-w-md mx-auto">
-          Why DevResume AI matters — and where it's going.
+          Why <span className="text-foreground">DevResume</span> AI matters — and where it's going.
         </p>
       </motion.div>
 
