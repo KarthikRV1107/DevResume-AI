@@ -23,7 +23,7 @@ const Hero = () => {
           </h1>
 
           <p className="text-muted-foreground text-lg max-w-lg">
-            DevResume AI reads your unfinished code and recovers your goals, progress, and next steps — so you can resume building in minutes, not hours.
+            <span className="text-foreground">DevResume</span> AI reads your unfinished code and recovers your goals, progress, and next steps — so you can resume building in minutes, not hours.
           </p>
 
           <div className="flex gap-4 flex-wrap">

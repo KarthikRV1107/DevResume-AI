@@ -18,7 +18,7 @@ const Navbar = () => {
       <div className="container mx-auto flex items-center justify-between h-16 px-4">
         <a href="#" className="flex items-center gap-2 text-primary font-bold text-lg">
           <Terminal className="w-5 h-5" />
-          <span>DevResume AI</span>
+          <span><span className="text-foreground">DevResume</span> AI</span>
         </a>
 
         <div className="hidden md:flex items-center gap-8">
