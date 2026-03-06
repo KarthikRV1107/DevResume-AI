@@ -203,9 +203,7 @@ const Demo = () => {
           viewport={{ once: true }}
           className="text-center mb-12"
         >
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            <span className="text-gradient">Try It Live</span>
-          </h2>
+          <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground mb-3">Try It Live</h2>
           <p className="text-muted-foreground max-w-md mx-auto">
             Paste any unfinished code — watch AI recover your context in real time.
           </p>
@@ -219,11 +217,11 @@ const Demo = () => {
             viewport={{ once: true }}
             className="space-y-4"
           >
-            <div className="rounded-lg border border-border bg-card/80 backdrop-blur-sm overflow-hidden">
-              <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-card/50">
-                <span className="w-3 h-3 rounded-full bg-destructive/70" />
-                <span className="w-3 h-3 rounded-full bg-yellow-500/70" />
-                <span className="w-3 h-3 rounded-full bg-primary/70" />
+            <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+              <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-secondary/50">
+                <span className="w-3 h-3 rounded-full bg-destructive/40" />
+                <span className="w-3 h-3 rounded-full bg-yellow-400/40" />
+                <span className="w-3 h-3 rounded-full bg-green-400/40" />
                 <span className="ml-2 text-xs text-muted-foreground font-mono">editor</span>
               </div>
               <textarea
@@ -236,12 +234,12 @@ const Demo = () => {
               />
             </div>
             <div className="flex gap-3">
-              <Button variant="hero" onClick={handleAnalyze} disabled={loading || !code.trim()} className="flex-1">
+              <Button onClick={handleAnalyze} disabled={loading || !code.trim()} className="flex-1">
                 {loading ? <Loader2 className="animate-spin" /> : <Play />}
                 {loading ? "Analyzing..." : "Analyze"}
               </Button>
               <Button
-                variant="hero-outline"
+                variant="outline"
                 onClick={() => setChatOpen(!chatOpen)}
                 className="gap-2"
               >
@@ -256,7 +254,7 @@ const Demo = () => {
             initial={{ opacity: 0, x: 20 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
-            className="rounded-lg border border-border bg-card/80 backdrop-blur-sm p-6 min-h-[380px] flex items-center justify-center overflow-y-auto max-h-[600px]"
+            className="rounded-xl border border-border bg-card p-6 min-h-[380px] flex items-center justify-center overflow-y-auto max-h-[600px] shadow-sm"
           >
             <AnimatePresence mode="wait">
               {loading ? (
@@ -280,10 +278,10 @@ const Demo = () => {
                 <motion.div key="result" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full space-y-5 font-mono text-sm">
                   {/* Language & Source badge */}
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs px-2 py-0.5 rounded bg-primary/20 text-primary border border-primary/30">
+                    <span className="text-xs px-2 py-0.5 rounded bg-secondary text-secondary-foreground border border-border">
                       {result.language}
                     </span>
-                    <span className="text-xs px-2 py-0.5 rounded bg-accent/20 text-accent-foreground border border-border">
+                    <span className="text-xs px-2 py-0.5 rounded bg-secondary text-secondary-foreground border border-border">
                       {result.source === "llm-enhanced" ? "✨ AI Enhanced" : "Static Analysis"}
                     </span>
                     <span className="text-xs text-muted-foreground ml-auto">
@@ -293,7 +291,7 @@ const Demo = () => {
 
                   {/* Goal */}
                   <div>
-                    <p className="text-primary text-xs mb-1 flex items-center gap-1"><Brain className="w-3 h-3" /> GOAL</p>
+                    <p className="text-foreground text-xs mb-1 flex items-center gap-1 font-semibold"><Brain className="w-3 h-3" /> GOAL</p>
                     <p className="text-foreground">{result.goal}</p>
                     {result.current_state && (
                       <p className="text-muted-foreground text-xs mt-1">{result.current_state}</p>
@@ -302,7 +300,7 @@ const Demo = () => {
 
                   {/* Next Steps */}
                   <div>
-                    <p className="text-primary text-xs mb-1 flex items-center gap-1"><ChevronRight className="w-3 h-3" /> NEXT STEPS</p>
+                    <p className="text-foreground text-xs mb-1 flex items-center gap-1 font-semibold"><ChevronRight className="w-3 h-3" /> NEXT STEPS</p>
                     <ul className="space-y-1">
                       {result.next_steps.map((n, i) => (
                         <motion.li
@@ -312,7 +310,7 @@ const Demo = () => {
                           transition={{ delay: i * 0.1 }}
                           className="text-foreground flex items-start gap-2"
                         >
-                          <span className="text-primary mt-0.5">▸</span> {n}
+                          <span className="text-muted-foreground mt-0.5">▸</span> {n}
                         </motion.li>
                       ))}
                     </ul>
@@ -321,10 +319,10 @@ const Demo = () => {
                   {/* Risks */}
                   {result.risks.length > 0 && (
                     <div>
-                      <p className="text-primary text-xs mb-1 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> RISKS</p>
+                    <p className="text-foreground text-xs mb-1 flex items-center gap-1 font-semibold"><AlertTriangle className="w-3 h-3" /> RISKS</p>
                       <ul className="space-y-1">
                         {result.risks.map((r, i) => (
-                          <li key={i} className="text-yellow-400/80 flex items-start gap-2">
+                          <li key={i} className="text-muted-foreground flex items-start gap-2">
                             <span className="mt-0.5">⚠</span> {r}
                           </li>
                         ))}
@@ -335,11 +333,11 @@ const Demo = () => {
                   {/* Architectural Improvements */}
                   {result.architectural_improvements?.length > 0 && (
                     <div>
-                      <p className="text-primary text-xs mb-1 flex items-center gap-1"><Zap className="w-3 h-3" /> IMPROVEMENTS</p>
+                      <p className="text-foreground text-xs mb-1 flex items-center gap-1 font-semibold"><Zap className="w-3 h-3" /> IMPROVEMENTS</p>
                       <ul className="space-y-1">
                         {result.architectural_improvements.map((a, i) => (
                           <li key={i} className="text-foreground flex items-start gap-2">
-                            <span className="text-primary mt-0.5">◆</span> {a}
+                            <span className="text-muted-foreground mt-0.5">◆</span> {a}
                           </li>
                         ))}
                       </ul>
@@ -349,11 +347,11 @@ const Demo = () => {
                   {/* Momentum */}
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <p className="text-primary text-xs">MOMENTUM</p>
+                      <p className="text-foreground text-xs font-semibold">MOMENTUM</p>
                       <p className="text-xs text-muted-foreground">
                         Effort: <span className={
                           result.effort_level === "High" ? "text-destructive" :
-                          result.effort_level === "Medium" ? "text-yellow-400" : "text-primary"
+                          result.effort_level === "Medium" ? "text-muted-foreground" : "text-foreground"
                         }>{result.effort_level}</span>
                       </p>
                     </div>
@@ -362,10 +360,7 @@ const Demo = () => {
                         initial={{ width: 0 }}
                         animate={{ width: `${result.completion_percentage}%` }}
                         transition={{ duration: 1, ease: "easeOut" }}
-                        className="h-full rounded-full"
-                        style={{
-                          background: `linear-gradient(90deg, hsl(142 71% 45%), hsl(185 70% 50%))`,
-                        }}
+                        className="h-full rounded-full bg-foreground"
                       />
                     </div>
                     <p className="text-muted-foreground text-xs mt-1">{result.completion_percentage}% complete</p>
@@ -373,7 +368,7 @@ const Demo = () => {
                 </motion.div>
               ) : (
                 <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center space-y-3">
-                  <Brain className="w-10 h-10 text-primary/30 mx-auto" />
+                  <Brain className="w-10 h-10 text-muted-foreground/30 mx-auto" />
                   <p className="text-muted-foreground text-sm font-mono">
                     Paste code and hit Analyze for AI-powered results.
                   </p>
@@ -391,10 +386,10 @@ const Demo = () => {
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className="fixed bottom-6 right-6 w-80 md:w-96 z-50 rounded-lg border border-primary/30 bg-card/95 backdrop-blur-md shadow-2xl glow-border overflow-hidden"
+            className="fixed bottom-6 right-6 w-80 md:w-96 z-50 rounded-xl border border-border bg-background shadow-xl overflow-hidden"
           >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/50">
-              <span className="text-sm font-mono text-primary flex items-center gap-2">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-secondary/50">
+              <span className="text-sm font-mono text-foreground flex items-center gap-2">
                 <MessageSquare className="w-4 h-4" /> Ask about your code
               </span>
               <button onClick={() => setChatOpen(false)} className="text-muted-foreground hover:text-foreground transition-colors">

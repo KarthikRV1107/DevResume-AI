@@ -3,48 +3,50 @@ import { Button } from "@/components/ui/button";
 
 const Hero = () => {
   return (
-    <section className="relative min-h-screen flex items-center dot-grid overflow-hidden pt-16">
-      <div className="container mx-auto px-4 grid md:grid-cols-2 gap-12 items-center">
+    <section className="relative min-h-screen flex items-center pt-14">
+      {/* Subtle grid background */}
+      <div className="absolute inset-0 subtle-grid" />
+      
+      <div className="container mx-auto px-4 grid md:grid-cols-2 gap-16 items-center relative z-10">
         {/* Left */}
         <motion.div
-          initial={{ opacity: 0, x: -40 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.7 }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
           className="space-y-6"
         >
-          <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/5 px-4 py-1.5 text-xs font-mono text-primary">
-            <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-3 py-1 text-xs text-muted-foreground">
+            <span className="w-1.5 h-1.5 rounded-full bg-foreground" />
             Context Recovery Engine
           </div>
 
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight">
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-[1.1] tracking-tight text-foreground">
             You didn't lose your skill.{" "}
-            <span className="text-gradient">You lost your context.</span>
+            <span className="text-muted-foreground">You lost your context.</span>
           </h1>
 
-          <p className="text-muted-foreground text-lg max-w-lg">
-            <span className="text-foreground">DevResume</span> AI reads your unfinished code and recovers your goals, progress, and next steps — so you can resume building in minutes, not hours.
+          <p className="text-muted-foreground text-lg max-w-lg leading-relaxed">
+            DevResume AI reads your unfinished code and recovers your goals, progress, and next steps — so you can resume building in minutes, not hours.
           </p>
 
-          <div className="flex gap-4 flex-wrap">
-            <Button variant="hero" size="lg">Get Started</Button>
-            <Button variant="hero-outline" size="lg">See Demo</Button>
+          <div className="flex gap-3 flex-wrap">
+            <Button size="lg">Get Started</Button>
+            <Button variant="outline" size="lg">See Demo</Button>
           </div>
         </motion.div>
 
-        {/* Right — fake editor */}
+        {/* Right — code card */}
         <motion.div
-          initial={{ opacity: 0, x: 40 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.7, delay: 0.2 }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.15 }}
           className="relative"
         >
-          {/* Code card */}
-          <div className="rounded-lg border border-border bg-card p-4 glow-border font-mono text-sm">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="w-3 h-3 rounded-full bg-destructive/70" />
-              <span className="w-3 h-3 rounded-full bg-yellow-500/70" />
-              <span className="w-3 h-3 rounded-full bg-primary/70" />
+          <div className="rounded-xl border border-border bg-card p-5 shadow-sm font-mono text-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="w-3 h-3 rounded-full bg-destructive/40" />
+              <span className="w-3 h-3 rounded-full bg-yellow-400/40" />
+              <span className="w-3 h-3 rounded-full bg-green-400/40" />
               <span className="ml-2 text-xs text-muted-foreground">auth.py</span>
             </div>
             <pre className="text-muted-foreground leading-relaxed overflow-x-auto">
@@ -62,14 +64,14 @@ const Hero = () => {
             </pre>
           </div>
 
-          {/* Floating AI analysis card */}
+          {/* AI analysis card */}
           <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: 0.5, delay: 0.8 }}
-            className="absolute -bottom-6 -left-6 md:-left-10 w-72 rounded-lg border border-primary/30 bg-card/95 backdrop-blur-sm p-4 glow-border"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.6 }}
+            className="absolute -bottom-6 -left-4 md:-left-8 w-72 rounded-xl border border-border bg-background p-4 shadow-lg"
           >
-            <p className="text-xs font-mono text-primary mb-2">AI Analysis</p>
+            <p className="text-xs font-medium text-foreground mb-2">AI Analysis</p>
             <div className="space-y-2 text-xs">
               <div>
                 <span className="text-muted-foreground">GOAL:</span>{" "}
@@ -85,8 +87,8 @@ const Hero = () => {
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: "35%" }}
-                    transition={{ duration: 1.2, delay: 1.2 }}
-                    className="h-full rounded-full bg-primary"
+                    transition={{ duration: 1, delay: 1 }}
+                    className="h-full rounded-full bg-foreground"
                   />
                 </div>
                 <span className="text-muted-foreground">35% complete</span>
