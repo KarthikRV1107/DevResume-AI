@@ -5,11 +5,9 @@ import Demo from "@/components/Demo";
 import Team from "@/components/Team";
 import Pitch from "@/components/Pitch";
 import Footer from "@/components/Footer";
-import Background3D from "@/components/Background3D";
 
 const Index = () => (
-  <div className="min-h-screen scanline relative">
-    <Background3D />
+  <div className="min-h-screen bg-background relative">
     <Navbar />
     <Hero />
     <Features />
