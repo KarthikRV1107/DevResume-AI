@@ -1,19 +1,25 @@
-import { Terminal } from "lucide-react";
+import { Terminal, Github, ExternalLink } from "lucide-react";
 
 const Footer = () => (
-  <footer className="border-t border-border py-8">
-    <div className="container mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
-      <div className="flex items-center gap-2 text-sm text-foreground">
-        <Terminal className="w-4 h-4 text-muted-foreground" />
-        <span className="font-medium">DevResume</span>
-        <span className="text-muted-foreground">AI</span>
+  <footer className="border-t border-border py-10">
+    <div className="container mx-auto px-4">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Terminal className="w-4 h-4 text-primary" />
+          <span className="font-mono"><span className="text-foreground">DevResume</span> AI</span>
+          <span className="text-border">|</span>
+          <span>Built by BWT_Techies</span>
+        </div>
+        <div className="flex items-center gap-6 text-sm text-muted-foreground">
+          <a href="#features" className="hover:text-primary transition-colors">Features</a>
+          <a href="#demo" className="hover:text-primary transition-colors">Demo</a>
+          <a href="#team" className="hover:text-primary transition-colors">Team</a>
+          <a href="#pitch" className="hover:text-primary transition-colors">Pitch</a>
+        </div>
       </div>
-      <div className="flex items-center gap-6 text-sm text-muted-foreground">
-        <a href="#features" className="hover:text-foreground transition-colors">Features</a>
-        <a href="#demo" className="hover:text-foreground transition-colors">Demo</a>
-        <a href="#team" className="hover:text-foreground transition-colors">Team</a>
+      <div className="mt-6 text-center text-xs text-muted-foreground/60 font-mono">
+        © 2026 BWT_Techies. Context Recovery Engine v1.0
       </div>
-      <p className="text-xs text-muted-foreground">© 2026 BWT_Techies. All rights reserved.</p>
     </div>
   </footer>
 );
