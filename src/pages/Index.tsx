@@ -6,6 +6,7 @@ import Team from "@/components/Team";
 import Pitch from "@/components/Pitch";
 import Footer from "@/components/Footer";
 import Background3D from "@/components/Background3D";
+import ThemeSwitcher from "@/components/ThemeSwitcher";
 
 const Index = () => (
   <div className="min-h-screen scanline relative">
@@ -17,6 +18,7 @@ const Index = () => (
     <Team />
     <Pitch />
     <Footer />
+    <ThemeSwitcher />
   </div>
 );
 
