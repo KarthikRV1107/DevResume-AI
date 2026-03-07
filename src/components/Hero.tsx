@@ -27,8 +27,8 @@ const Hero = () => {
           </p>
 
           <div className="flex gap-4 flex-wrap">
-            <Button variant="hero" size="lg">Get Started</Button>
-            <Button variant="hero-outline" size="lg">See Demo</Button>
+            <Button variant="hero" size="lg" onClick={() => document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' })}>Get Started</Button>
+            <Button variant="hero-outline" size="lg" onClick={() => document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' })}>See Demo</Button>
           </div>
         </motion.div>
 

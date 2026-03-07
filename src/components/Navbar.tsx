@@ -27,7 +27,7 @@ const Navbar = () => {
               {l.label}
             </a>
           ))}
-          <Button variant="hero" size="sm">Try Now</Button>
+          <Button variant="hero" size="sm" onClick={() => document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' })}>Try Now</Button>
         </div>
 
         <button className="md:hidden text-foreground" onClick={() => setOpen(!open)}>
@@ -49,7 +49,7 @@ const Navbar = () => {
                   {l.label}
                 </a>
               ))}
-              <Button variant="hero" size="sm" className="w-fit">Try Now</Button>
+              <Button variant="hero" size="sm" className="w-fit" onClick={() => { setOpen(false); document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' }); }}>Try Now</Button>
             </div>
           </motion.div>
         )}
