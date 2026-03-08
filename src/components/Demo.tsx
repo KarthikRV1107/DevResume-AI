@@ -63,6 +63,11 @@ const Demo = () => {
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Suggestions state
+  const [suggestions, setSuggestions] = useState<{ title: string; code: string; explanation: string }[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+
   // Chat state
   const [chatOpen, setChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);
