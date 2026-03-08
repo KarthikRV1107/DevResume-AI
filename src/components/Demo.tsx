@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Play, Loader2, Zap, AlertTriangle, Brain, ChevronRight, MessageSquare, Send, X, Upload, FileCode, Trash2 } from "lucide-react";
+import { Play, Loader2, Zap, AlertTriangle, Brain, ChevronRight, MessageSquare, Send, X, Upload, FileCode, Trash2, Download, FileText } from "lucide-react";
+import { exportAsMarkdown, exportAsPDF } from "@/lib/exportAnalysis";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -542,6 +543,26 @@ const Demo = () => {
                       />
                     </div>
                     <p className="text-muted-foreground text-xs mt-1">{result.completion_percentage}% complete</p>
+                  </div>
+
+                  {/* Export buttons */}
+                  <div className="flex gap-2 pt-2 border-t border-border">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => exportAsMarkdown({ ...result, code, created_at: new Date().toISOString() })}
+                      className="flex-1 text-xs"
+                    >
+                      <FileText className="w-3 h-3" /> Export .md
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => exportAsPDF({ ...result, code, created_at: new Date().toISOString() })}
+                      className="flex-1 text-xs"
+                    >
+                      <Download className="w-3 h-3" /> Export PDF
+                    </Button>
                   </div>
                 </motion.div>
               ) : (
