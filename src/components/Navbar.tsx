@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Terminal, Menu, X, History, LogOut, User, Settings } from "lucide-react";
+import { Terminal, Menu, X, History, LogOut, User, Settings, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -84,6 +84,9 @@ const Navbar = () => {
                 <DropdownMenuItem onClick={() => navigate("/history")} className="gap-2 cursor-pointer">
                   <History className="w-4 h-4" /> Analysis History
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/dashboard")} className="gap-2 cursor-pointer">
+                  <BarChart3 className="w-4 h-4" /> Dashboard
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={signOut} className="gap-2 cursor-pointer text-destructive">
                   <LogOut className="w-4 h-4" /> Sign Out
@@ -138,6 +141,9 @@ const Navbar = () => {
                   </button>
                   <button onClick={() => { setOpen(false); navigate("/history"); }} className="text-sm text-muted-foreground hover:text-primary transition-colors text-left flex items-center gap-2">
                     <History className="w-4 h-4" /> History
+                  </button>
+                  <button onClick={() => { setOpen(false); navigate("/dashboard"); }} className="text-sm text-muted-foreground hover:text-primary transition-colors text-left flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4" /> Dashboard
                   </button>
                   <button onClick={() => { setOpen(false); signOut(); }} className="text-sm text-muted-foreground hover:text-primary transition-colors text-left flex items-center gap-2">
                     <LogOut className="w-4 h-4" /> Sign Out
