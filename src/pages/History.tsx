@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Terminal, ArrowLeft, Clock, Code, Brain, Trash2, ChevronRight, AlertTriangle, Zap } from "lucide-react";
+import { Terminal, ArrowLeft, Clock, Code, Brain, Trash2, ChevronRight, AlertTriangle, Zap, Download, FileText } from "lucide-react";
+import { exportAsMarkdown, exportAsPDF } from "@/lib/exportAnalysis";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
