@@ -37,6 +37,7 @@ type ChatMsg = { role: "user" | "assistant"; content: string };
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
 const Demo = () => {
+  const { user } = useAuth();
   const [code, setCode] = useState(sampleCode);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
