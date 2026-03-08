@@ -36,6 +36,21 @@ type ChatMsg = { role: "user" | "assistant"; content: string };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
+interface UploadedFile {
+  name: string;
+  content: string;
+}
+
+const ALLOWED_EXTENSIONS = [
+  ".js", ".ts", ".tsx", ".jsx", ".py", ".go", ".rs", ".java", ".cpp", ".c",
+  ".h", ".hpp", ".cs", ".rb", ".php", ".swift", ".kt", ".scala", ".sh",
+  ".bash", ".sql", ".html", ".css", ".scss", ".json", ".yaml", ".yml",
+  ".toml", ".xml", ".md", ".txt", ".env", ".vue", ".svelte",
+];
+
+const MAX_FILE_SIZE = 100 * 1024; // 100KB per file
+const MAX_FILES = 10;
+
 const Demo = () => {
   const { user } = useAuth();
   const [code, setCode] = useState(sampleCode);
@@ -43,6 +58,9 @@ const Demo = () => {
   const [loading, setLoading] = useState(false);
   const [streamText, setStreamText] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Chat state
   const [chatOpen, setChatOpen] = useState(false);
@@ -50,6 +68,81 @@ const Demo = () => {
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  const processFiles = useCallback(async (files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    const totalAfter = uploadedFiles.length + fileArray.length;
+    if (totalAfter > MAX_FILES) {
+      toast.error(`Maximum ${MAX_FILES} files allowed`);
+      return;
+    }
+
+    const newFiles: UploadedFile[] = [];
+
+    for (const file of fileArray) {
+      const ext = "." + file.name.split(".").pop()?.toLowerCase();
+      if (!ALLOWED_EXTENSIONS.includes(ext)) {
+        toast.error(`Unsupported file type: ${file.name}`);
+        continue;
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error(`File too large (>100KB): ${file.name}`);
+        continue;
+      }
+      try {
+        const content = await file.text();
+        newFiles.push({ name: file.name, content });
+      } catch {
+        toast.error(`Failed to read: ${file.name}`);
+      }
+    }
+
+    if (newFiles.length > 0) {
+      const all = [...uploadedFiles, ...newFiles];
+      setUploadedFiles(all);
+      // Combine all files into the code editor
+      const combined = all
+        .map((f) => `// ═══ ${f.name} ═══\n${f.content}`)
+        .join("\n\n");
+      setCode(combined);
+      toast.success(`${newFiles.length} file(s) loaded`);
+    }
+  }, [uploadedFiles]);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    if (e.dataTransfer.files.length > 0) {
+      processFiles(e.dataTransfer.files);
+    }
+  }, [processFiles]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback(() => {
+    setIsDragOver(false);
+  }, []);
+
+  const removeFile = useCallback((index: number) => {
+    const updated = uploadedFiles.filter((_, i) => i !== index);
+    setUploadedFiles(updated);
+    if (updated.length === 0) {
+      setCode(sampleCode);
+    } else {
+      const combined = updated
+        .map((f) => `// ═══ ${f.name} ═══\n${f.content}`)
+        .join("\n\n");
+      setCode(combined);
+    }
+  }, [uploadedFiles]);
+
+  const clearAllFiles = useCallback(() => {
+    setUploadedFiles([]);
+    setCode(sampleCode);
+  }, []);
 
   const handleAnalyze = async () => {
     if (!code.trim()) return;
