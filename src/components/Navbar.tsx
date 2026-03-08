@@ -142,6 +142,9 @@ const Navbar = () => {
                   <button onClick={() => { setOpen(false); navigate("/history"); }} className="text-sm text-muted-foreground hover:text-primary transition-colors text-left flex items-center gap-2">
                     <History className="w-4 h-4" /> History
                   </button>
+                  <button onClick={() => { setOpen(false); navigate("/dashboard"); }} className="text-sm text-muted-foreground hover:text-primary transition-colors text-left flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4" /> Dashboard
+                  </button>
                   <button onClick={() => { setOpen(false); signOut(); }} className="text-sm text-muted-foreground hover:text-primary transition-colors text-left flex items-center gap-2">
                     <LogOut className="w-4 h-4" /> Sign Out
                   </button>
