@@ -129,6 +129,14 @@
     background-size: 24px 24px;
   }
 
+  .dark .dot-grid {
+    background-image: radial-gradient(circle, hsl(142 71% 45% / 0.08) 1px, transparent 1px);
+  }
+
+  :root .dot-grid {
+    background-image: radial-gradient(circle, hsl(142 71% 30% / 0.15) 1px, transparent 1px);
+  }
+
   .scanline {
     position: relative;
     overflow: hidden;
