@@ -1,11 +1,16 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useRef, useMemo, useEffect, useState } from "react";
+import { useRef, useMemo, useEffect, useState, createContext, useContext } from "react";
 import * as THREE from "three";
 import { useTheme } from "next-themes";
+
+// Theme context to pass isDark into Canvas children
+const ThemeContext3D = createContext(true);
+const useIsDark = () => useContext(ThemeContext3D);
 
 // Animated wireframe torus knot
 const FloatingShape = () => {
   const meshRef = useRef<THREE.Mesh>(null);
+  const isDark = useIsDark();
 
   useFrame((state) => {
     if (!meshRef.current) return;
@@ -17,14 +22,20 @@ const FloatingShape = () => {
   return (
     <mesh ref={meshRef} position={[4, 1, -3]}>
       <torusKnotGeometry args={[1.2, 0.35, 100, 16]} />
-      <meshBasicMaterial color="hsl(142, 71%, 45%)" wireframe transparent opacity={0.06} />
+      <meshBasicMaterial
+        color={isDark ? "hsl(142, 71%, 45%)" : "hsl(142, 71%, 30%)"}
+        wireframe
+        transparent
+        opacity={isDark ? 0.06 : 0.12}
+      />
     </mesh>
   );
 };
 
 // Glowing orb
-const GlowOrb = ({ position, color, speed }: { position: [number, number, number]; color: string; speed: number }) => {
+const GlowOrb = ({ position, color, lightColor, speed }: { position: [number, number, number]; color: string; lightColor: string; speed: number }) => {
   const meshRef = useRef<THREE.Mesh>(null);
+  const isDark = useIsDark();
 
   useFrame((state) => {
     if (!meshRef.current) return;
@@ -37,35 +48,29 @@ const GlowOrb = ({ position, color, speed }: { position: [number, number, number
   return (
     <mesh ref={meshRef} position={position}>
       <sphereGeometry args={[0.15, 16, 16]} />
-      <meshBasicMaterial color={color} transparent opacity={0.4} />
+      <meshBasicMaterial
+        color={isDark ? color : lightColor}
+        transparent
+        opacity={isDark ? 0.4 : 0.6}
+      />
     </mesh>
   );
 };
 
 const ParticleField = () => {
   const meshRef = useRef<THREE.Points>(null);
+  const isDark = useIsDark();
   const count = 2000;
   const mouse = useRef(new THREE.Vector2(0, 0));
   const smoothMouse = useRef(new THREE.Vector2(0, 0));
   const { viewport } = useThree();
 
-  const [positions, basePositions, colors, sizes] = useMemo(() => {
-    const pos = new Float32Array(count * 3);
-    const base = new Float32Array(count * 3);
+  const darkColors = useMemo(() => {
     const col = new Float32Array(count * 3);
-    const sz = new Float32Array(count);
     const green = new THREE.Color("hsl(142, 71%, 45%)");
     const cyan = new THREE.Color("hsl(185, 70%, 50%)");
     const white = new THREE.Color("hsl(210, 20%, 80%)");
-
     for (let i = 0; i < count; i++) {
-      const x = (Math.random() - 0.5) * 24;
-      const y = (Math.random() - 0.5) * 24;
-      const z = (Math.random() - 0.5) * 18;
-      pos[i * 3] = x; base[i * 3] = x;
-      pos[i * 3 + 1] = y; base[i * 3 + 1] = y;
-      pos[i * 3 + 2] = z; base[i * 3 + 2] = z;
-
       const t = Math.random();
       const c = t < 0.6
         ? green.clone().lerp(cyan, t / 0.6)
@@ -73,11 +78,52 @@ const ParticleField = () => {
       col[i * 3] = c.r;
       col[i * 3 + 1] = c.g;
       col[i * 3 + 2] = c.b;
-
-      sz[i] = 0.02 + Math.random() * 0.06;
     }
-    return [pos, base, col, sz];
+    return col;
   }, []);
+
+  const lightColors = useMemo(() => {
+    const col = new Float32Array(count * 3);
+    const green = new THREE.Color("hsl(142, 71%, 30%)");
+    const cyan = new THREE.Color("hsl(185, 70%, 35%)");
+    const dark = new THREE.Color("hsl(210, 20%, 40%)");
+    for (let i = 0; i < count; i++) {
+      const t = Math.random();
+      const c = t < 0.6
+        ? green.clone().lerp(cyan, t / 0.6)
+        : cyan.clone().lerp(dark, (t - 0.6) / 0.4);
+      col[i * 3] = c.r;
+      col[i * 3 + 1] = c.g;
+      col[i * 3 + 2] = c.b;
+    }
+    return col;
+  }, []);
+
+  const [positions, basePositions] = useMemo(() => {
+    const pos = new Float32Array(count * 3);
+    const base = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      const x = (Math.random() - 0.5) * 24;
+      const y = (Math.random() - 0.5) * 24;
+      const z = (Math.random() - 0.5) * 18;
+      pos[i * 3] = x; base[i * 3] = x;
+      pos[i * 3 + 1] = y; base[i * 3 + 1] = y;
+      pos[i * 3 + 2] = z; base[i * 3 + 2] = z;
+    }
+    return [pos, base];
+  }, []);
+
+  const activeColors = isDark ? darkColors : lightColors;
+
+  useEffect(() => {
+    if (meshRef.current) {
+      const colorAttr = meshRef.current.geometry.attributes.color;
+      if (colorAttr) {
+        (colorAttr.array as Float32Array).set(activeColors);
+        colorAttr.needsUpdate = true;
+      }
+    }
+  }, [isDark, activeColors]);
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
@@ -132,15 +178,23 @@ const ParticleField = () => {
     <points ref={meshRef}>
       <bufferGeometry>
         <bufferAttribute attach="attributes-position" args={[positions, 3]} count={count} />
-        <bufferAttribute attach="attributes-color" args={[colors, 3]} count={count} />
+        <bufferAttribute attach="attributes-color" args={[activeColors, 3]} count={count} />
       </bufferGeometry>
-      <pointsMaterial size={0.045} vertexColors transparent opacity={0.7} sizeAttenuation depthWrite={false} />
+      <pointsMaterial
+        size={isDark ? 0.045 : 0.055}
+        vertexColors
+        transparent
+        opacity={isDark ? 0.7 : 0.85}
+        sizeAttenuation
+        depthWrite={false}
+      />
     </points>
   );
 };
 
 const FloatingGrid = () => {
   const meshRef = useRef<THREE.LineSegments>(null);
+  const isDark = useIsDark();
 
   const geometry = useMemo(() => {
     const geo = new THREE.BufferGeometry();
@@ -167,13 +221,18 @@ const FloatingGrid = () => {
 
   return (
     <lineSegments ref={meshRef} geometry={geometry} rotation={[0.4, 0, 0]}>
-      <lineBasicMaterial color="hsl(142, 71%, 45%)" transparent opacity={0.05} />
+      <lineBasicMaterial
+        color={isDark ? "hsl(142, 71%, 45%)" : "hsl(142, 71%, 30%)"}
+        transparent
+        opacity={isDark ? 0.05 : 0.12}
+      />
     </lineSegments>
   );
 };
 
 const ConnectionLines = () => {
   const linesRef = useRef<THREE.LineSegments>(null);
+  const isDark = useIsDark();
   const count = 80;
 
   const positions = useMemo(() => {
@@ -203,7 +262,11 @@ const ConnectionLines = () => {
       <bufferGeometry>
         <bufferAttribute attach="attributes-position" args={[positions, 3]} count={count * 2} />
       </bufferGeometry>
-      <lineBasicMaterial color="hsl(185, 70%, 50%)" transparent opacity={0.04} />
+      <lineBasicMaterial
+        color={isDark ? "hsl(185, 70%, 50%)" : "hsl(185, 70%, 35%)"}
+        transparent
+        opacity={isDark ? 0.04 : 0.1}
+      />
     </lineSegments>
   );
 };
@@ -230,14 +293,16 @@ const Background3D = () => {
         style={{ background: bgColor }}
         key={resolvedTheme}
       >
-        <fog attach="fog" args={[fogColor, 8, 22]} />
-        <ParticleField />
-        <FloatingGrid />
-        <FloatingShape />
-        <ConnectionLines />
-        <GlowOrb position={[-3, 2, -2]} color="hsl(142, 71%, 45%)" speed={0.5} />
-        <GlowOrb position={[5, -1, -4]} color="hsl(185, 70%, 50%)" speed={0.7} />
-        <GlowOrb position={[-1, -3, -1]} color="hsl(142, 71%, 55%)" speed={0.3} />
+        <ThemeContext3D.Provider value={isDark}>
+          <fog attach="fog" args={[fogColor, 8, isDark ? 22 : 18]} />
+          <ParticleField />
+          <FloatingGrid />
+          <FloatingShape />
+          <ConnectionLines />
+          <GlowOrb position={[-3, 2, -2]} color="hsl(142, 71%, 45%)" lightColor="hsl(142, 71%, 30%)" speed={0.5} />
+          <GlowOrb position={[5, -1, -4]} color="hsl(185, 70%, 50%)" lightColor="hsl(185, 70%, 35%)" speed={0.7} />
+          <GlowOrb position={[-1, -3, -1]} color="hsl(142, 71%, 55%)" lightColor="hsl(142, 71%, 35%)" speed={0.3} />
+        </ThemeContext3D.Provider>
       </Canvas>
     </div>
   );
