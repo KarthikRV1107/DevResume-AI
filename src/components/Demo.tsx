@@ -106,7 +106,29 @@ const Demo = () => {
           }
         }
 
-        if (finalResult) setResult(finalResult);
+        if (finalResult) {
+          setResult(finalResult);
+          // Save to history for logged-in users
+          if (user) {
+            supabase.from("analyses").insert({
+              user_id: user.id,
+              code: code.slice(0, 10000),
+              language: finalResult.language,
+              goal: finalResult.goal,
+              completion_percentage: finalResult.completion_percentage,
+              effort_level: finalResult.effort_level,
+              next_steps: finalResult.next_steps as any,
+              risks: finalResult.risks as any,
+              issues: finalResult.issues as any,
+              architectural_improvements: finalResult.architectural_improvements as any,
+              confidence_score: finalResult.confidence_score,
+              current_state: finalResult.current_state,
+              source: finalResult.source,
+            }).then(({ error }) => {
+              if (!error) toast.success("Analysis saved to history!");
+            });
+          }
+        }
       } else {
         // Non-streaming fallback
         const data = await resp.json();
