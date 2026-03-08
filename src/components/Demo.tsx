@@ -550,7 +550,7 @@ const Demo = () => {
                     <p className="text-muted-foreground text-xs mt-1">{result.completion_percentage}% complete</p>
                   </div>
 
-                  {/* Export buttons */}
+                  {/* Action buttons */}
                   <div className="flex gap-2 pt-2 border-t border-border">
                     <Button
                       variant="outline"
@@ -568,7 +568,85 @@ const Demo = () => {
                     >
                       <Download className="w-3 h-3" /> Export PDF
                     </Button>
+                    <Button
+                      variant="hero"
+                      size="sm"
+                      disabled={suggestionsLoading}
+                      onClick={async () => {
+                        setSuggestionsLoading(true);
+                        setSuggestions([]);
+                        try {
+                          const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/suggest`, {
+                            method: "POST",
+                            headers: {
+                              "Content-Type": "application/json",
+                              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+                            },
+                            body: JSON.stringify({ code, analysis: result }),
+                          });
+                          if (!resp.ok) {
+                            const err = await resp.json().catch(() => ({ error: "Failed" }));
+                            toast.error(err.error || "Failed to get suggestions");
+                            return;
+                          }
+                          const data = await resp.json();
+                          setSuggestions(data.suggestions || []);
+                        } catch {
+                          toast.error("Failed to generate suggestions");
+                        } finally {
+                          setSuggestionsLoading(false);
+                        }
+                      }}
+                      className="flex-1 text-xs"
+                    >
+                      {suggestionsLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                      {suggestionsLoading ? "Generating..." : "AI Fixes"}
+                    </Button>
                   </div>
+
+                  {/* AI Suggestions */}
+                  <AnimatePresence>
+                    {suggestions.length > 0 && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="space-y-3 pt-2"
+                      >
+                        <p className="text-primary text-xs flex items-center gap-1">
+                          <Sparkles className="w-3 h-3" /> AI SUGGESTIONS
+                        </p>
+                        {suggestions.map((s, i) => (
+                          <motion.div
+                            key={i}
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: i * 0.1 }}
+                            className="rounded-md border border-border bg-background/50 p-3 space-y-2"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="text-xs font-semibold text-foreground">{s.title}</p>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(s.code);
+                                  setCopiedIdx(i);
+                                  setTimeout(() => setCopiedIdx(null), 2000);
+                                  toast.success("Copied to clipboard!");
+                                }}
+                                className="shrink-0 text-muted-foreground hover:text-primary transition-colors"
+                              >
+                                {copiedIdx === i ? <Check className="w-3.5 h-3.5 text-primary" /> : <Copy className="w-3.5 h-3.5" />}
+                              </button>
+                            </div>
+                            <pre className="text-[11px] text-muted-foreground bg-card/80 rounded p-2 overflow-x-auto max-h-32">
+                              {s.code}
+                            </pre>
+                            <p className="text-[11px] text-muted-foreground/80 italic">{s.explanation}</p>
+                          </motion.div>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </motion.div>
               ) : (
                 <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center space-y-3">
