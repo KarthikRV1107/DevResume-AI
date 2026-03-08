@@ -1,6 +1,7 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useRef, useMemo, useEffect } from "react";
+import { useRef, useMemo, useEffect, useState } from "react";
 import * as THREE from "three";
+import { useTheme } from "next-themes";
 
 // Animated wireframe torus knot
 const FloatingShape = () => {
@@ -106,7 +107,6 @@ const ParticleField = () => {
       const by = basePositions[i * 3 + 1];
       const bz = basePositions[i * 3 + 2];
 
-      // Gentle float
       const floatY = Math.sin(time * 0.3 + i * 0.01) * 0.05;
       const floatX = Math.cos(time * 0.2 + i * 0.015) * 0.03;
 
@@ -172,7 +172,6 @@ const FloatingGrid = () => {
   );
 };
 
-// Connection lines between nearby particles
 const ConnectionLines = () => {
   const linesRef = useRef<THREE.LineSegments>(null);
   const count = 80;
@@ -209,16 +208,29 @@ const ConnectionLines = () => {
   );
 };
 
+const DARK_BG = "hsl(220, 20%, 4%)";
+const LIGHT_BG = "hsl(0, 0%, 98%)";
+
 const Background3D = () => {
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
+  const isDark = !mounted || resolvedTheme === "dark";
+  const bgColor = isDark ? DARK_BG : LIGHT_BG;
+  const fogColor = isDark ? DARK_BG : LIGHT_BG;
+
   return (
     <div className="fixed inset-0" style={{ zIndex: -1 }}>
       <Canvas
         camera={{ position: [0, 0, 7], fov: 55 }}
         dpr={[1, 1.5]}
         gl={{ antialias: false, alpha: true }}
-        style={{ background: "hsl(220 20% 4%)" }}
+        style={{ background: bgColor }}
+        key={resolvedTheme}
       >
-        <fog attach="fog" args={["hsl(220, 20%, 4%)", 8, 22]} />
+        <fog attach="fog" args={[fogColor, 8, 22]} />
         <ParticleField />
         <FloatingGrid />
         <FloatingShape />
