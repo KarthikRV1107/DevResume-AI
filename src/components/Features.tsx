@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Brain, BarChart3, Target, AlertTriangle, Code, Shield, Rocket } from "lucide-react";
+import { Brain, BarChart3, Target, AlertTriangle, Code, Shield } from "lucide-react";
 
 const features = [
   { icon: Brain, title: "Context Recovery", desc: "Reads your code and reconstructs what you were trying to build, even months later.", color: "from-primary to-primary/60" },
@@ -8,7 +8,6 @@ const features = [
   { icon: AlertTriangle, title: "Risk Radar", desc: "Identifies stale dependencies, security gaps, and technical debt in abandoned code.", color: "from-yellow-500/80 to-primary/60" },
   { icon: Code, title: "Multi-Language", desc: "Supports Python, JavaScript, TypeScript, Java, C++, Go, Rust and more.", color: "from-primary to-accent/60" },
   { icon: Shield, title: "Security Scan", desc: "Detects hardcoded secrets, eval() usage, and common vulnerability patterns.", color: "from-destructive/60 to-primary/60" },
-  { icon: Rocket, title: "Publish & Share", desc: "Export polished analysis reports and share your project progress with teammates or stakeholders.", color: "from-primary to-primary/40" },
 ];
 
 const Features = () => (
