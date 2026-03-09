@@ -22,14 +22,19 @@ const Team = () => (
         <p className="text-muted-foreground">The team behind <span className="text-foreground">DevResume</span> AI.</p>
       </motion.div>
 
-      <div className="flex flex-wrap justify-center gap-8 md:gap-12">
+      <motion.div 
+        className="flex flex-wrap justify-center gap-8 md:gap-12"
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true, margin: "-50px" }}
+      >
         {members.map((m, i) => (
           <motion.div
             key={m.initials}
-            initial={{ opacity: 0, y: 20, scale: 0.9 }}
+            initial={{ opacity: 0, y: 30, scale: 0.8 }}
             whileInView={{ opacity: 1, y: 0, scale: 1 }}
             viewport={{ once: true }}
-            transition={{ delay: i * 0.12, type: "spring", stiffness: 200 }}
+            transition={{ delay: i * 0.15, type: "spring", stiffness: 150, damping: 15 }}
             whileHover={{ y: -6, transition: { duration: 0.2 } }}
             className="flex flex-col items-center gap-3 group"
           >
@@ -49,7 +54,7 @@ const Team = () => (
             </div>
           </motion.div>
         ))}
-      </div>
+      </motion.div>
     </div>
   </section>
 );
