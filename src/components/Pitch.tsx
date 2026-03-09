@@ -28,15 +28,20 @@ const Pitch = () => (
         </p>
       </motion.div>
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-4xl mx-auto mb-10">
+      <motion.div 
+        className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-4xl mx-auto mb-10"
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true, margin: "-50px" }}
+      >
         {cards.map((c, i) => (
           <motion.div
             key={c.title}
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, y: 30, x: -10 }}
+            whileInView={{ opacity: 1, y: 0, x: 0 }}
             viewport={{ once: true }}
-            transition={{ delay: i * 0.08 }}
-            whileHover={{ y: -3 }}
+            transition={{ delay: i * 0.1, duration: 0.5, ease: "easeOut" }}
+            whileHover={{ y: -3, scale: 1.02 }}
             className="rounded-lg border border-border bg-card/60 backdrop-blur-sm p-6 glow-border-hover hover:border-primary/40 transition-all duration-300"
           >
             <c.icon className="w-6 h-6 text-primary mb-3" />
@@ -44,13 +49,19 @@ const Pitch = () => (
             <p className="text-sm text-muted-foreground leading-relaxed">{c.desc}</p>
           </motion.div>
         ))}
-      </div>
-
-      <div className="text-center">
+      </motion.div>
+    
+      <motion.div 
+        className="text-center"
+        initial={{ opacity: 0, scale: 0.9 }}
+        whileInView={{ opacity: 1, scale: 1 }}
+        viewport={{ once: true }}
+        transition={{ delay: 0.6, duration: 0.4 }}
+      >
         <Button variant="hero" size="lg" asChild>
           <a href="#demo">Try the Demo</a>
         </Button>
-      </div>
+      </motion.div>
     </div>
   </section>
 );

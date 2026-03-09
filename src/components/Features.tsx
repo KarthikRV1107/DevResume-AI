@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Brain, BarChart3, Target, AlertTriangle, Code, Shield, Rocket } from "lucide-react";
+import { Brain, BarChart3, Target, AlertTriangle, Code, Shield } from "lucide-react";
 
 const features = [
   { icon: Brain, title: "Context Recovery", desc: "Reads your code and reconstructs what you were trying to build, even months later.", color: "from-primary to-primary/60" },
@@ -8,7 +8,6 @@ const features = [
   { icon: AlertTriangle, title: "Risk Radar", desc: "Identifies stale dependencies, security gaps, and technical debt in abandoned code.", color: "from-yellow-500/80 to-primary/60" },
   { icon: Code, title: "Multi-Language", desc: "Supports Python, JavaScript, TypeScript, Java, C++, Go, Rust and more.", color: "from-primary to-accent/60" },
   { icon: Shield, title: "Security Scan", desc: "Detects hardcoded secrets, eval() usage, and common vulnerability patterns.", color: "from-destructive/60 to-primary/60" },
-  { icon: Rocket, title: "Publish & Share", desc: "Export polished analysis reports and share your project progress with teammates or stakeholders.", color: "from-primary to-primary/40" },
 ];
 
 const Features = () => (
@@ -28,14 +27,20 @@ const Features = () => (
         </p>
       </motion.div>
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+      <motion.div 
+        className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto"
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true, margin: "-50px" }}
+        transition={{ staggerChildren: 0.1 }}
+      >
         {features.map((f, i) => (
           <motion.div
             key={f.title}
-            initial={{ opacity: 0, y: 30 }}
+            initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ delay: i * 0.08 }}
+            transition={{ delay: i * 0.1, duration: 0.5, ease: "easeOut" }}
             whileHover={{ y: -4, transition: { duration: 0.2 } }}
             className="group rounded-lg border border-border bg-card/60 backdrop-blur-sm p-6 glow-border-hover transition-all duration-300 hover:border-primary/40"
           >
@@ -46,7 +51,7 @@ const Features = () => (
             <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
           </motion.div>
         ))}
-      </div>
+      </motion.div>
     </div>
   </section>
 );
