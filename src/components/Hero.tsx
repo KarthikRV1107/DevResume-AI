@@ -1,7 +1,9 @@
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
 const Hero = () => {
+  const navigate = useNavigate();
   return (
     <section className="relative min-h-screen flex items-center dot-grid overflow-hidden pt-16">
       <div className="container mx-auto px-4 grid md:grid-cols-2 gap-12 items-center">
@@ -27,7 +29,7 @@ const Hero = () => {
           </p>
 
           <div className="flex gap-4 flex-wrap">
-            <Button variant="hero" size="lg" onClick={() => window.location.href = '/auth'}>Get Started</Button>
+            <Button variant="hero" size="lg" onClick={() => navigate('/auth')}>Get Started</Button>
             <Button variant="hero-outline" size="lg" onClick={() => document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' })}>See Demo</Button>
           </div>
         </motion.div>
