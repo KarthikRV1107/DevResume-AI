@@ -7,18 +7,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
-const sampleCode = `class PaymentHandler:
-    def __init__(self):
-        self.stripe = None
-        self.webhook_secret = ""
-
-    # TODO: validate webhook signature
-    # TODO: handle subscription renewals
-    def process(self, event):
-        if event.type == "checkout.session.completed":
-            pass  # need to fulfill order
-        # handle refunds?`;
-
 interface AnalysisResult {
   goal: string;
   language: string;
@@ -54,7 +42,7 @@ const MAX_FILES = 10;
 
 const Demo = () => {
   const { user } = useAuth();
-  const [code, setCode] = useState(sampleCode);
+  const [code, setCode] = useState("");
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [streamText, setStreamText] = useState("");
@@ -136,7 +124,7 @@ const Demo = () => {
     const updated = uploadedFiles.filter((_, i) => i !== index);
     setUploadedFiles(updated);
     if (updated.length === 0) {
-      setCode(sampleCode);
+      setCode("");
     } else {
       const combined = updated
         .map((f) => `// ═══ ${f.name} ═══\n${f.content}`)
@@ -147,7 +135,7 @@ const Demo = () => {
 
   const clearAllFiles = useCallback(() => {
     setUploadedFiles([]);
-    setCode(sampleCode);
+    setCode("");
   }, []);
 
   const handleAnalyze = async () => {
