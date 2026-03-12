@@ -54,7 +54,7 @@ const MAX_FILES = 10;
 
 const Demo = () => {
   const { user } = useAuth();
-  const [code, setCode] = useState(sampleCode);
+  const [code, setCode] = useState("");
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [streamText, setStreamText] = useState("");
