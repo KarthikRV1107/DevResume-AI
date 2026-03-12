@@ -18,7 +18,6 @@ import ThemeToggle from "@/components/ThemeToggle";
 const links = [
   { label: "Features", href: "#features" },
   { label: "Demo", href: "#demo" },
-  { label: "Pricing", href: "#pricing" },
   { label: "Team", href: "#team" },
   { label: "Pitch", href: "#pitch" },
 ];
