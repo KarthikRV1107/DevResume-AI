@@ -124,7 +124,7 @@ const Demo = () => {
     const updated = uploadedFiles.filter((_, i) => i !== index);
     setUploadedFiles(updated);
     if (updated.length === 0) {
-      setCode(sampleCode);
+      setCode("");
     } else {
       const combined = updated
         .map((f) => `// ═══ ${f.name} ═══\n${f.content}`)
