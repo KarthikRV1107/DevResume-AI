@@ -1,11 +1,12 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Play, Loader2, Zap, AlertTriangle, Brain, ChevronRight, MessageSquare, Send, X, Upload, FileCode, Trash2, Download, FileText, Sparkles, Copy, Check } from "lucide-react";
+import { Play, Loader2, Zap, AlertTriangle, Brain, ChevronRight, MessageSquare, Send, X, Upload, FileCode, Trash2, Download, FileText, Sparkles, Copy, Check, Bot, User, RotateCcw, Maximize2, Minimize2 } from "lucide-react";
 import { exportAsMarkdown, exportAsPDF } from "@/lib/exportAnalysis";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import ReactMarkdown from "react-markdown";
 
 interface AnalysisResult {
   goal: string;
