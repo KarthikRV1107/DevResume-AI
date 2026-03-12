@@ -7,18 +7,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
-const sampleCode = `class PaymentHandler:
-    def __init__(self):
-        self.stripe = None
-        self.webhook_secret = ""
-
-    # TODO: validate webhook signature
-    # TODO: handle subscription renewals
-    def process(self, event):
-        if event.type == "checkout.session.completed":
-            pass  # need to fulfill order
-        # handle refunds?`;
-
 interface AnalysisResult {
   goal: string;
   language: string;
