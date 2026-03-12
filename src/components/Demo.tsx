@@ -135,7 +135,7 @@ const Demo = () => {
 
   const clearAllFiles = useCallback(() => {
     setUploadedFiles([]);
-    setCode(sampleCode);
+    setCode("");
   }, []);
 
   const handleAnalyze = async () => {
