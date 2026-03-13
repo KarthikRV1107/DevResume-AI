@@ -86,6 +86,41 @@ const Dashboard = () => {
     }));
   }, [analyses]);
 
+  // Per-analysis momentum trend data with rolling average
+  const trendData = useMemo(() => {
+    return analyses.map((a, i) => {
+      const score = a.completion_percentage || 0;
+      // Rolling average of last 5 analyses
+      const windowStart = Math.max(0, i - 4);
+      const window = analyses.slice(windowStart, i + 1);
+      const rollingAvg = Math.round(
+        window.reduce((s, w) => s + (w.completion_percentage || 0), 0) / window.length
+      );
+      const date = new Date(a.created_at);
+      return {
+        label: `${date.getMonth() + 1}/${date.getDate()}`,
+        score,
+        rollingAvg,
+        language: a.language || "Unknown",
+        confidence: Math.round((Number(a.confidence_score) || 0) * 100),
+      };
+    });
+  }, [analyses]);
+
+  // Trend direction (compare recent 5 vs previous 5)
+  const trendDirection = useMemo(() => {
+    if (analyses.length < 2) return "neutral";
+    const recent = analyses.slice(-Math.min(5, analyses.length));
+    const recentAvg = recent.reduce((s, a) => s + (a.completion_percentage || 0), 0) / recent.length;
+    const older = analyses.slice(0, -recent.length);
+    if (older.length === 0) return "neutral";
+    const olderAvg = older.reduce((s, a) => s + (a.completion_percentage || 0), 0) / older.length;
+    const diff = recentAvg - olderAvg;
+    if (diff > 3) return "improving";
+    if (diff < -3) return "declining";
+    return "stable";
+  }, [analyses]);
+
   const stats = useMemo(() => {
     if (analyses.length === 0) return { total: 0, avgCompletion: 0, avgConfidence: 0, topLang: "—" };
     const avgCompletion = Math.round(analyses.reduce((s, a) => s + (a.completion_percentage || 0), 0) / analyses.length);
