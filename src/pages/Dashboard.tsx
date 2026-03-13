@@ -4,7 +4,7 @@ import { ArrowLeft, BarChart3, PieChart as PieChartIcon, TrendingUp, TrendingDow
 import { Link, useNavigate } from "react-router-dom";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, LineChart, Line, CartesianGrid, Legend,
+  PieChart, Pie, Cell, LineChart, Line, CartesianGrid, Legend, Area, ComposedChart, ReferenceLine,
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
