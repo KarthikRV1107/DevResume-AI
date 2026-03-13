@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, BarChart3, PieChart as PieChartIcon, TrendingUp, Activity } from "lucide-react";
+import { ArrowLeft, BarChart3, PieChart as PieChartIcon, TrendingUp, TrendingDown, Minus, Activity, Zap } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
