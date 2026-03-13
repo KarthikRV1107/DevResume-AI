@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, BarChart3, PieChart as PieChartIcon, TrendingUp, Activity } from "lucide-react";
+import { ArrowLeft, BarChart3, PieChart as PieChartIcon, TrendingUp, TrendingDown, Minus, Activity, Zap } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, LineChart, Line, CartesianGrid, Legend,
+  PieChart, Pie, Cell, LineChart, Line, CartesianGrid, Legend, Area, ComposedChart, ReferenceLine,
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -84,6 +84,41 @@ const Dashboard = () => {
       ...w,
       avgCompletion: w.count > 0 ? Math.round(w.totalCompletion / w.count) : 0,
     }));
+  }, [analyses]);
+
+  // Per-analysis momentum trend data with rolling average
+  const trendData = useMemo(() => {
+    return analyses.map((a, i) => {
+      const score = a.completion_percentage || 0;
+      // Rolling average of last 5 analyses
+      const windowStart = Math.max(0, i - 4);
+      const window = analyses.slice(windowStart, i + 1);
+      const rollingAvg = Math.round(
+        window.reduce((s, w) => s + (w.completion_percentage || 0), 0) / window.length
+      );
+      const date = new Date(a.created_at);
+      return {
+        label: `${date.getMonth() + 1}/${date.getDate()}`,
+        score,
+        rollingAvg,
+        language: a.language || "Unknown",
+        confidence: Math.round((Number(a.confidence_score) || 0) * 100),
+      };
+    });
+  }, [analyses]);
+
+  // Trend direction (compare recent 5 vs previous 5)
+  const trendDirection = useMemo(() => {
+    if (analyses.length < 2) return "neutral";
+    const recent = analyses.slice(-Math.min(5, analyses.length));
+    const recentAvg = recent.reduce((s, a) => s + (a.completion_percentage || 0), 0) / recent.length;
+    const older = analyses.slice(0, -recent.length);
+    if (older.length === 0) return "neutral";
+    const olderAvg = older.reduce((s, a) => s + (a.completion_percentage || 0), 0) / older.length;
+    const diff = recentAvg - olderAvg;
+    if (diff > 3) return "improving";
+    if (diff < -3) return "declining";
+    return "stable";
   }, [analyses]);
 
   const stats = useMemo(() => {
@@ -206,35 +241,131 @@ const Dashboard = () => {
               </motion.div>
             </div>
 
-            {/* Completion Trend Line */}
+            {/* Code Quality Trend — Momentum Score */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
               className="rounded-lg border border-border bg-card/80 backdrop-blur-sm p-6"
             >
-              <h2 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-primary" /> Average Completion Over Time
-              </h2>
-              <ResponsiveContainer width="100%" height={280}>
-                <LineChart data={weeklyData}>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-primary" /> Code Quality Trend
+                </h2>
+                <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
+                  trendDirection === "improving"
+                    ? "bg-primary/15 text-primary"
+                    : trendDirection === "declining"
+                    ? "bg-destructive/15 text-destructive"
+                    : "bg-muted text-muted-foreground"
+                }`}>
+                  {trendDirection === "improving" && <TrendingUp className="w-3 h-3" />}
+                  {trendDirection === "declining" && <TrendingDown className="w-3 h-3" />}
+                  {trendDirection === "stable" && <Minus className="w-3 h-3" />}
+                  {trendDirection === "neutral" && <Minus className="w-3 h-3" />}
+                  {trendDirection === "improving" ? "Improving" : trendDirection === "declining" ? "Declining" : "Stable"}
+                </span>
+              </div>
+              <ResponsiveContainer width="100%" height={300}>
+                <ComposedChart data={trendData}>
+                  <defs>
+                    <linearGradient id="scoreGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(142, 71%, 45%)" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(142, 71%, 45%)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="week" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                  <XAxis dataKey="label" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
                   <YAxis domain={[0, 100]} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-                  <Tooltip contentStyle={tooltipStyle} />
-                  <Legend />
+                  <Tooltip
+                    contentStyle={tooltipStyle}
+                    formatter={(value: number, name: string) => [
+                      `${value}%`,
+                      name === "score" ? "Momentum Score" : "Rolling Avg (5)",
+                    ]}
+                  />
+                  <ReferenceLine y={stats.avgCompletion} stroke="hsl(var(--muted-foreground))" strokeDasharray="6 4" strokeOpacity={0.5} label={{ value: `Avg ${stats.avgCompletion}%`, fill: "hsl(var(--muted-foreground))", fontSize: 10, position: "right" }} />
+                  <Area type="monotone" dataKey="score" fill="url(#scoreGrad)" stroke="none" />
                   <Line
                     type="monotone"
-                    dataKey="avgCompletion"
-                    name="Avg Completion %"
-                    stroke="hsl(185, 70%, 50%)"
-                    strokeWidth={2}
-                    dot={{ fill: "hsl(185, 70%, 50%)", r: 4 }}
-                    activeDot={{ r: 6 }}
+                    dataKey="score"
+                    name="score"
+                    stroke="hsl(142, 71%, 45%)"
+                    strokeWidth={1.5}
+                    dot={{ fill: "hsl(142, 71%, 45%)", r: 3 }}
+                    activeDot={{ r: 5 }}
                   />
-                </LineChart>
+                  <Line
+                    type="monotone"
+                    dataKey="rollingAvg"
+                    name="rollingAvg"
+                    stroke="hsl(262, 60%, 55%)"
+                    strokeWidth={2.5}
+                    strokeDasharray="5 3"
+                    dot={false}
+                  />
+                  <Legend
+                    formatter={(value: string) =>
+                      value === "score" ? "Momentum Score" : "Rolling Average"
+                    }
+                  />
+                </ComposedChart>
               </ResponsiveContainer>
             </motion.div>
+
+            {/* Confidence vs Completion Scatter-style */}
+            <div className="grid md:grid-cols-2 gap-6">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="rounded-lg border border-border bg-card/80 backdrop-blur-sm p-6"
+              >
+                <h2 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-primary" /> Confidence vs Momentum
+                </h2>
+                <ResponsiveContainer width="100%" height={260}>
+                  <ComposedChart data={trendData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="label" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                    <YAxis domain={[0, 100]} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Legend />
+                    <Bar dataKey="score" name="Momentum %" fill="hsl(142, 71%, 45%)" radius={[3, 3, 0, 0]} opacity={0.7} />
+                    <Line type="monotone" dataKey="confidence" name="Confidence %" stroke="hsl(38, 92%, 50%)" strokeWidth={2} dot={{ r: 3 }} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </motion.div>
+
+              {/* Weekly Avg Completion (existing, kept) */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                className="rounded-lg border border-border bg-card/80 backdrop-blur-sm p-6"
+              >
+                <h2 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-primary" /> Weekly Avg Completion
+                </h2>
+                <ResponsiveContainer width="100%" height={260}>
+                  <LineChart data={weeklyData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="week" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                    <YAxis domain={[0, 100]} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Line
+                      type="monotone"
+                      dataKey="avgCompletion"
+                      name="Avg Completion %"
+                      stroke="hsl(185, 70%, 50%)"
+                      strokeWidth={2}
+                      dot={{ fill: "hsl(185, 70%, 50%)", r: 4 }}
+                      activeDot={{ r: 6 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </motion.div>
+            </div>
           </div>
         )}
       </div>
