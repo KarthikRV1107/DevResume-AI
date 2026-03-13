@@ -16,10 +16,21 @@ interface AnalysisResult {
   effort_level: string;
   next_steps: string[];
   risks: string[];
-  issues: { type: string; message: string; severity: string }[];
+  issues: { type: string; message: string; severity: string; line?: number }[];
   confidence_score: number;
   architectural_improvements: string[];
   source: string;
+  code_quality_grade?: string;
+  highlights?: string[];
+  metrics?: {
+    total_lines: number;
+    code_lines: number;
+    comment_lines: number;
+    comment_ratio: number;
+    functions: number;
+    classes: number;
+    imports: number;
+  };
 }
 
 type ChatMsg = { role: "user" | "assistant"; content: string };
