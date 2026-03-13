@@ -16,10 +16,21 @@ interface AnalysisResult {
   effort_level: string;
   next_steps: string[];
   risks: string[];
-  issues: { type: string; message: string; severity: string }[];
+  issues: { type: string; message: string; severity: string; line?: number }[];
   confidence_score: number;
   architectural_improvements: string[];
   source: string;
+  code_quality_grade?: string;
+  highlights?: string[];
+  metrics?: {
+    total_lines: number;
+    code_lines: number;
+    comment_lines: number;
+    comment_ratio: number;
+    functions: number;
+    classes: number;
+    imports: number;
+  };
 }
 
 type ChatMsg = { role: "user" | "assistant"; content: string };
@@ -461,7 +472,7 @@ const Demo = () => {
                 </motion.div>
               ) : result ? (
                 <motion.div key="result" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full space-y-5 font-mono text-sm">
-                  {/* Language & Source badge */}
+                  {/* Language, Source & Grade badges */}
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs px-2 py-0.5 rounded bg-primary/20 text-primary border border-primary/30">
                       {result.language}
@@ -469,10 +480,47 @@ const Demo = () => {
                     <span className="text-xs px-2 py-0.5 rounded bg-accent/20 text-accent-foreground border border-border">
                       {result.source === "llm-enhanced" ? "✨ AI Enhanced" : "Static Analysis"}
                     </span>
+                    {result.code_quality_grade && (
+                      <span className={`text-xs px-2 py-0.5 rounded font-bold border ${
+                        result.code_quality_grade === "A" ? "bg-primary/20 text-primary border-primary/30" :
+                        result.code_quality_grade === "B" ? "bg-primary/10 text-primary border-primary/20" :
+                        result.code_quality_grade === "C" ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" :
+                        "bg-destructive/20 text-destructive border-destructive/30"
+                      }`}>
+                        Grade: {result.code_quality_grade}
+                      </span>
+                    )}
                     <span className="text-xs text-muted-foreground ml-auto">
                       Confidence: {Math.round(result.confidence_score * 100)}%
                     </span>
                   </div>
+
+                  {/* Metrics bar */}
+                  {result.metrics && (
+                    <div className="flex gap-3 flex-wrap text-xs text-muted-foreground">
+                      <span>{result.metrics.code_lines} code lines</span>
+                      <span>•</span>
+                      <span>{result.metrics.functions} functions</span>
+                      <span>•</span>
+                      <span>{result.metrics.classes} classes</span>
+                      <span>•</span>
+                      <span>{result.metrics.comment_ratio}% comments</span>
+                    </div>
+                  )}
+
+                  {/* Highlights */}
+                  {result.highlights && result.highlights.length > 0 && (
+                    <div>
+                      <p className="text-primary text-xs mb-1 flex items-center gap-1">✅ STRENGTHS</p>
+                      <ul className="space-y-1">
+                        {result.highlights.map((h, i) => (
+                          <li key={i} className="text-muted-foreground flex items-start gap-2 text-xs">
+                            <span className="text-primary mt-0.5">✓</span> {h}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
 
                   {/* Goal */}
                   <div>
