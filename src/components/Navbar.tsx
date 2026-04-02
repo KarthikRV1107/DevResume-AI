@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Terminal, Menu, X, History, LogOut, User, Settings, BarChart3 } from "lucide-react";
+import { Terminal, Menu, X, History, LogOut, User, Settings, BarChart3, FlaskConical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -85,6 +85,9 @@ const Navbar = () => {
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate("/dashboard")} className="gap-2 cursor-pointer">
                   <BarChart3 className="w-4 h-4" /> Dashboard
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/analyze")} className="gap-2 cursor-pointer">
+                  <FlaskConical className="w-4 h-4" /> Project Analysis
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={signOut} className="gap-2 cursor-pointer text-destructive">

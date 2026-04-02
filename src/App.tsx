@@ -11,6 +11,7 @@ import ResetPassword from "./pages/ResetPassword";
 import History from "./pages/History";
 import Profile from "./pages/Profile";
 import Dashboard from "./pages/Dashboard";
+import Analyze from "./pages/Analyze";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
               <Route path="/history" element={<History />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/analyze" element={<Analyze />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
