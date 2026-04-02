@@ -86,6 +86,9 @@ const Navbar = () => {
                 <DropdownMenuItem onClick={() => navigate("/dashboard")} className="gap-2 cursor-pointer">
                   <BarChart3 className="w-4 h-4" /> Dashboard
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/analyze")} className="gap-2 cursor-pointer">
+                  <FlaskConical className="w-4 h-4" /> Project Analysis
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={signOut} className="gap-2 cursor-pointer text-destructive">
                   <LogOut className="w-4 h-4" /> Sign Out
