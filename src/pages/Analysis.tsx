@@ -284,7 +284,7 @@ const Analysis = () => {
   }, [chatInput, chatMessages, chatLoading, code, result]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen scanline relative">
       <Background3D />
       <Navbar />
       <main className="pt-24 pb-16">
@@ -294,15 +294,15 @@ const Analysis = () => {
             animate={{ opacity: 1, y: 0 }}
             className="text-center mb-12"
           >
-            <h1 className="text-3xl md:text-4xl font-bold mb-4">
-              <span className="text-gradient">Code Analysis</span>
+            <h1 className="text-3xl md:text-5xl font-bold mb-4">
+              <span className="text-gradient">Analysis</span>
             </h1>
-            <p className="text-muted-foreground max-w-md mx-auto">
+            <p className="text-muted-foreground max-w-lg mx-auto text-base md:text-lg">
               Paste any unfinished code — watch AI recover your context in real time.
             </p>
           </motion.div>
 
-          <div className="grid md:grid-cols-2 gap-6 max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
             {/* Input */}
             <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
               <div
@@ -360,9 +360,9 @@ const Analysis = () => {
                 <textarea
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
-                  rows={16}
+                  rows={24}
                   placeholder="Paste your unfinished code here or upload files above..."
-                  className="w-full bg-transparent p-4 font-mono text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none"
+                  className="w-full bg-transparent p-4 font-mono text-sm md:text-base text-foreground placeholder:text-muted-foreground resize-none focus:outline-none leading-relaxed"
                   spellCheck={false}
                 />
               </div>
@@ -381,7 +381,7 @@ const Analysis = () => {
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              className="rounded-lg border border-border bg-card/80 backdrop-blur-sm p-6 min-h-[380px] flex items-center justify-center overflow-y-auto max-h-[700px]"
+              className="rounded-lg border border-border bg-card/80 backdrop-blur-sm p-6 md:p-8 min-h-[500px] flex items-center justify-center overflow-y-auto max-h-[900px]"
             >
               <AnimatePresence mode="wait">
                 {loading ? (
