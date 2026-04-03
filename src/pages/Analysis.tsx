@@ -360,9 +360,9 @@ const Analysis = () => {
                 <textarea
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
-                  rows={16}
+                  rows={24}
                   placeholder="Paste your unfinished code here or upload files above..."
-                  className="w-full bg-transparent p-4 font-mono text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none"
+                  className="w-full bg-transparent p-4 font-mono text-sm md:text-base text-foreground placeholder:text-muted-foreground resize-none focus:outline-none leading-relaxed"
                   spellCheck={false}
                 />
               </div>
