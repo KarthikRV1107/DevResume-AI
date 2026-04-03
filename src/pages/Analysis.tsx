@@ -381,7 +381,7 @@ const Analysis = () => {
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              className="rounded-lg border border-border bg-card/80 backdrop-blur-sm p-6 min-h-[380px] flex items-center justify-center overflow-y-auto max-h-[700px]"
+              className="rounded-lg border border-border bg-card/80 backdrop-blur-sm p-6 md:p-8 min-h-[500px] flex items-center justify-center overflow-y-auto max-h-[900px]"
             >
               <AnimatePresence mode="wait">
                 {loading ? (
