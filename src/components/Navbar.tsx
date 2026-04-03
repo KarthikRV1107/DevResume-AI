@@ -81,7 +81,7 @@ const Navbar = () => {
                   <Settings className="w-4 h-4" /> Profile Settings
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate("/analysis")} className="gap-2 cursor-pointer">
-                  <FlaskConical className="w-4 h-4" /> New Analysis
+                  <FlaskConical className="w-4 h-4" /> Analysis
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate("/history")} className="gap-2 cursor-pointer">
                   <History className="w-4 h-4" /> Analysis History
