@@ -11,6 +11,7 @@ import ResetPassword from "./pages/ResetPassword";
 import History from "./pages/History";
 import Profile from "./pages/Profile";
 import Dashboard from "./pages/Dashboard";
+import Analysis from "./pages/Analysis";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
