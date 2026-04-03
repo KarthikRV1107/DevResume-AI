@@ -80,6 +80,9 @@ const Navbar = () => {
                 <DropdownMenuItem onClick={() => navigate("/profile")} className="gap-2 cursor-pointer">
                   <Settings className="w-4 h-4" /> Profile Settings
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/analysis")} className="gap-2 cursor-pointer">
+                  <FlaskConical className="w-4 h-4" /> New Analysis
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate("/history")} className="gap-2 cursor-pointer">
                   <History className="w-4 h-4" /> Analysis History
                 </DropdownMenuItem>
