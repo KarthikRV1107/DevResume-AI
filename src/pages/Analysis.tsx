@@ -302,7 +302,7 @@ const Analysis = () => {
             </p>
           </motion.div>
 
-          <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
+          <div className="grid md:grid-cols-2 <div className="grid md:grid-cols-2 gap-8 max-w-[90rem] mx-auto px-4">">
             {/* Input */}
             <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
               <div
