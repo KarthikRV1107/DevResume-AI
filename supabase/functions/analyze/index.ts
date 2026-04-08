@@ -362,8 +362,8 @@ serve(async (req) => {
       });
     }
 
-    if (code.length > 100000) {
-      return new Response(JSON.stringify({ error: "Code exceeds 100KB limit" }), {
+    if (code.length > 500000) {
+      return new Response(JSON.stringify({ error: "Code exceeds 500KB limit. Try uploading fewer files." }), {
         status: 413,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
