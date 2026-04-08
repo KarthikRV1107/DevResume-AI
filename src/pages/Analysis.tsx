@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, Send, X, Bot, User, RotateCcw, Maximize2, Minimize2, Package, TestTube2, Brain } from "lucide-react";
+import { Play, Loader2, Zap, AlertTriangle, Brain, ChevronRight, MessageSquare, Send, X, Upload, FileCode, Trash2, Download, FileText, Sparkles, Copy, Check, Bot, User, RotateCcw, Maximize2, Minimize2 } from "lucide-react";
+import { exportAsMarkdown, exportAsPDF } from "@/lib/exportAnalysis";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -8,16 +9,6 @@ import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import Navbar from "@/components/Navbar";
 import Background3D from "@/components/Background3D";
-import AnalysisSidebar, { type AnalysisSection } from "@/components/analysis/AnalysisSidebar";
-import InputSection from "@/components/analysis/InputSection";
-import OverviewSection from "@/components/analysis/OverviewSection";
-import SecuritySection from "@/components/analysis/SecuritySection";
-import CodeQualitySection from "@/components/analysis/CodeQualitySection";
-import PerformanceSection from "@/components/analysis/PerformanceSection";
-import ArchitectureSection from "@/components/analysis/ArchitectureSection";
-import RiskSection from "@/components/analysis/RiskSection";
-import DashboardSection from "@/components/analysis/DashboardSection";
-import PlaceholderSection from "@/components/analysis/PlaceholderSection";
 
 interface AnalysisResult {
   goal: string;
@@ -48,6 +39,21 @@ type ChatMsg = { role: "user" | "assistant"; content: string };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
+interface UploadedFile {
+  name: string;
+  content: string;
+}
+
+const ALLOWED_EXTENSIONS = [
+  ".js", ".ts", ".tsx", ".jsx", ".py", ".go", ".rs", ".java", ".cpp", ".c",
+  ".h", ".hpp", ".cs", ".rb", ".php", ".swift", ".kt", ".scala", ".sh",
+  ".bash", ".sql", ".html", ".css", ".scss", ".json", ".yaml", ".yml",
+  ".toml", ".xml", ".md", ".txt", ".env", ".vue", ".svelte",
+];
+
+const MAX_FILE_SIZE = 100 * 1024;
+const MAX_FILES = 10;
+
 const QUICK_PROMPTS = [
   "What's the biggest risk in this code?",
   "How can I improve performance?",
@@ -62,10 +68,13 @@ const Analysis = () => {
   const [loading, setLoading] = useState(false);
   const [streamText, setStreamText] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
-  const [activeSection, setActiveSection] = useState<AnalysisSection>("input");
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [suggestions, setSuggestions] = useState<{ title: string; code: string; explanation: string }[]>([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
 
   const [chatOpen, setChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);
@@ -75,8 +84,63 @@ const Analysis = () => {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (chatOpen) chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (chatOpen) {
+      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [chatMessages, chatOpen]);
+
+  const processFiles = useCallback(async (files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    const totalAfter = uploadedFiles.length + fileArray.length;
+    if (totalAfter > MAX_FILES) {
+      toast.error(`Maximum ${MAX_FILES} files allowed`);
+      return;
+    }
+    const newFiles: UploadedFile[] = [];
+    for (const file of fileArray) {
+      const ext = "." + file.name.split(".").pop()?.toLowerCase();
+      if (!ALLOWED_EXTENSIONS.includes(ext)) {
+        toast.error(`Unsupported file type: ${file.name}`);
+        continue;
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error(`File too large (>100KB): ${file.name}`);
+        continue;
+      }
+      try {
+        const content = await file.text();
+        newFiles.push({ name: file.name, content });
+      } catch {
+        toast.error(`Failed to read: ${file.name}`);
+      }
+    }
+    if (newFiles.length > 0) {
+      const all = [...uploadedFiles, ...newFiles];
+      setUploadedFiles(all);
+      const combined = all.map((f) => `// ═══ ${f.name} ═══\n${f.content}`).join("\n\n");
+      setCode(combined);
+      toast.success(`${newFiles.length} file(s) loaded`);
+    }
+  }, [uploadedFiles]);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    if (e.dataTransfer.files.length > 0) processFiles(e.dataTransfer.files);
+  }, [processFiles]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragOver(true); }, []);
+  const handleDragLeave = useCallback(() => { setIsDragOver(false); }, []);
+
+  const removeFile = useCallback((index: number) => {
+    const updated = uploadedFiles.filter((_, i) => i !== index);
+    setUploadedFiles(updated);
+    if (updated.length === 0) { setCode(""); } else {
+      setCode(updated.map((f) => `// ═══ ${f.name} ═══\n${f.content}`).join("\n\n"));
+    }
+  }, [uploadedFiles]);
+
+  const clearAllFiles = useCallback(() => { setUploadedFiles([]); setCode(""); }, []);
 
   const handleAnalyze = async () => {
     if (!code.trim()) return;
@@ -124,7 +188,6 @@ const Analysis = () => {
         }
         if (finalResult) {
           setResult(finalResult);
-          setActiveSection("overview");
           if (user) {
             supabase.from("analyses").insert({
               user_id: user.id,
@@ -149,7 +212,6 @@ const Analysis = () => {
         const data = await resp.json();
         if (data?.error) { toast.error(data.error); return; }
         setResult(data);
-        setActiveSection("overview");
       }
     } catch (e: any) {
       console.error("Analysis failed:", e);
@@ -158,22 +220,6 @@ const Analysis = () => {
       setLoading(false);
       setIsStreaming(false);
     }
-  };
-
-  const handleGetSuggestions = async () => {
-    if (!result) return;
-    setSuggestionsLoading(true);
-    setSuggestions([]);
-    try {
-      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/suggest`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
-        body: JSON.stringify({ code, analysis: result }),
-      });
-      if (!resp.ok) { toast.error("Failed to get suggestions"); return; }
-      const data = await resp.json();
-      setSuggestions(data.suggestions || []);
-    } catch { toast.error("Failed to generate suggestions"); } finally { setSuggestionsLoading(false); }
   };
 
   const sendChat = useCallback(async () => {
@@ -199,7 +245,10 @@ const Analysis = () => {
       };
       const resp = await fetch(CHAT_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
         body: JSON.stringify({ messages: [contextMsg, ...newMessages] }),
       });
       if (!resp.ok || !resp.body) throw new Error("Chat failed");
@@ -225,7 +274,8 @@ const Analysis = () => {
           } catch { }
         }
       }
-    } catch {
+    } catch (e) {
+      console.error("Chat error:", e);
       toast.error("Chat failed. Try again.");
     } finally {
       setChatLoading(false);
@@ -233,103 +283,284 @@ const Analysis = () => {
     }
   }, [chatInput, chatMessages, chatLoading, code, result]);
 
-  const renderSection = () => {
-    if (loading) {
-      return (
-        <div className="flex-1 flex items-center justify-center">
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center space-y-3">
-            <Loader2 className="w-10 h-10 text-primary animate-spin mx-auto" />
-            <p className="text-sm text-muted-foreground font-mono">
-              {isStreaming && streamText ? streamText : "AI is deep analyzing your project..."}
-            </p>
-            <div className="flex gap-1 justify-center">
-              {[0, 1, 2].map((i) => (
-                <motion.div key={i} className="w-2 h-2 rounded-full bg-primary" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }} />
-              ))}
-            </div>
-          </motion.div>
-        </div>
-      );
-    }
-
-    switch (activeSection) {
-      case "input":
-        return <InputSection code={code} setCode={setCode} loading={loading} onAnalyze={handleAnalyze} onChatToggle={() => setChatOpen(!chatOpen)} />;
-      case "overview":
-        return result ? <OverviewSection result={result} code={code} onGetSuggestions={handleGetSuggestions} suggestionsLoading={suggestionsLoading} /> : null;
-      case "code":
-        return result ? <CodeQualitySection issues={result.issues} codeQualityGrade={result.code_quality_grade} architecturalImprovements={result.architectural_improvements} metrics={result.metrics} /> : null;
-      case "security":
-        return result ? <SecuritySection issues={result.issues} risks={result.risks} /> : null;
-      case "performance":
-        return result ? <PerformanceSection issues={result.issues} /> : null;
-      case "architecture":
-        return result ? <ArchitectureSection architecturalImprovements={result.architectural_improvements} metrics={result.metrics} /> : null;
-      case "dependencies":
-        return <PlaceholderSection title="Dependency Analysis" icon={Package} description="Full dependency tree analysis with vulnerability scanning." features={["Outdated libraries", "Dependency tree", "Heavy packages", "License risks"]} />;
-      case "testing":
-        return <PlaceholderSection title="Testing & Coverage" icon={TestTube2} description="Unit and integration test coverage analysis." features={["Coverage %", "Untested paths", "Missing tests", "Test quality"]} />;
-      case "ai-insights":
-        return result ? (
-          <div className="space-y-6 p-6">
-            <div className="flex items-center gap-3">
-              <Brain className="w-5 h-5 text-primary" />
-              <h2 className="text-xl font-bold text-foreground font-mono">AI Insights & Recommendations</h2>
-            </div>
-            <div className="rounded-lg border border-primary/20 bg-primary/5 backdrop-blur-sm p-5">
-              <p className="text-xs text-primary font-mono mb-3">🧠 IF I WERE THE CTO...</p>
-              <div className="space-y-3 text-sm text-foreground">
-                <p>Based on the analysis of your {result.language} project:</p>
-                <ul className="space-y-2">
-                  <li className="flex items-start gap-2"><span className="text-primary font-bold">1.</span> <span><strong>Priority:</strong> Address {result.issues.filter(i => i.severity === "error").length} critical issues immediately</span></li>
-                  <li className="flex items-start gap-2"><span className="text-primary font-bold">2.</span> <span><strong>Security:</strong> {result.issues.filter(i => i.type === "security").length > 0 ? "Security vulnerabilities detected — fix before deployment" : "No major security concerns found"}</span></li>
-                  <li className="flex items-start gap-2"><span className="text-primary font-bold">3.</span> <span><strong>Architecture:</strong> {result.architectural_improvements.length > 0 ? result.architectural_improvements[0] : "Architecture looks solid"}</span></li>
-                  <li className="flex items-start gap-2"><span className="text-primary font-bold">4.</span> <span><strong>Momentum:</strong> Project is {result.completion_percentage}% complete with {result.effort_level} effort remaining</span></li>
-                </ul>
-              </div>
-            </div>
-            <div className="rounded-lg border border-border bg-card/50 backdrop-blur-sm p-5">
-              <p className="text-xs text-primary font-mono mb-3">📋 IMPROVEMENT ROADMAP</p>
-              <div className="space-y-2">
-                {result.next_steps.map((step, i) => (
-                  <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }}
-                    className="flex items-start gap-3 p-3 rounded-md border border-border bg-card/30"
-                  >
-                    <span className={`shrink-0 text-xs px-2 py-0.5 rounded font-mono font-bold ${
-                      i === 0 ? "bg-destructive/20 text-destructive" : i < 3 ? "bg-yellow-500/20 text-yellow-400" : "bg-primary/20 text-primary"
-                    }`}>
-                      {i === 0 ? "NOW" : i < 3 ? "SOON" : "LATER"}
-                    </span>
-                    <span className="text-sm text-foreground">{step}</span>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-          </div>
-        ) : null;
-      case "risks":
-        return result ? <RiskSection issues={result.issues} risks={result.risks} completionPercentage={result.completion_percentage} /> : null;
-      case "dashboard":
-        return result ? <DashboardSection issues={result.issues} completionPercentage={result.completion_percentage} confidenceScore={result.confidence_score} metrics={result.metrics} /> : null;
-      default:
-        return null;
-    }
-  };
-
   return (
-    <div className="h-screen flex flex-col scanline relative">
+    <div className="min-h-screen scanline relative">
       <Background3D />
       <Navbar />
-      <div className="flex-1 flex overflow-hidden pt-16">
-        <AnalysisSidebar activeSection={activeSection} onSectionChange={setActiveSection} hasResult={!!result} />
-        <main className="flex-1 overflow-y-auto relative">
-          <AnimatePresence mode="wait">
-            <motion.div key={activeSection} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="h-full">
-              {renderSection()}
+      <main className="pt-24 pb-16">
+        <div className="container mx-auto px-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center mb-12"
+          >
+            <h1 className="text-3xl md:text-5xl font-bold mb-4">
+              <span className="text-gradient">Analysis</span>
+            </h1>
+            <p className="text-muted-foreground max-w-lg mx-auto text-base md:text-lg">
+              Paste any unfinished code — watch AI recover your context in real time.
+            </p>
+          </motion.div>
+
+          <div className={"grid md:grid-cols-2 gap-8 max-w-[90rem] mx-auto px-4"}>
+            {/* Input */}
+            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
+              <div
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onClick={() => fileInputRef.current?.click()}
+                className={`rounded-lg border-2 border-dashed p-4 text-center cursor-pointer transition-colors ${
+                  isDragOver ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+                }`}
+              >
+                <Upload className="w-5 h-5 mx-auto mb-1 text-muted-foreground" />
+                <p className="text-xs text-muted-foreground">
+                  Drop files here or <span className="text-primary">browse</span>
+                </p>
+                <p className="text-[10px] text-muted-foreground/60 mt-1">
+                  .js .ts .py .go .rs .java .cpp + more · Max 100KB each · Up to 10 files
+                </p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept={ALLOWED_EXTENSIONS.join(",")}
+                  className="hidden"
+                  onChange={(e) => e.target.files && processFiles(e.target.files)}
+                />
+              </div>
+
+              {uploadedFiles.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {uploadedFiles.map((f, i) => (
+                    <span key={i} className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded bg-primary/10 text-primary border border-primary/20 font-mono">
+                      <FileCode className="w-3 h-3" />
+                      {f.name}
+                      <button onClick={(e) => { e.stopPropagation(); removeFile(i); }} className="hover:text-destructive transition-colors">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                  <button onClick={clearAllFiles} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded text-muted-foreground hover:text-destructive transition-colors">
+                    <Trash2 className="w-3 h-3" /> Clear all
+                  </button>
+                </div>
+              )}
+
+              <div className="rounded-lg border border-border bg-card/80 backdrop-blur-sm overflow-hidden">
+                <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-card/50">
+                  <span className="w-3 h-3 rounded-full bg-destructive/70" />
+                  <span className="w-3 h-3 rounded-full bg-yellow-500/70" />
+                  <span className="w-3 h-3 rounded-full bg-primary/70" />
+                  <span className="ml-2 text-xs text-muted-foreground font-mono">
+                    {uploadedFiles.length > 0 ? `${uploadedFiles.length} file(s)` : "editor"}
+                  </span>
+                </div>
+                <textarea
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  placeholder="Paste your unfinished code here or upload files above..."
+                  className="w-full bg-transparent p-4 font-mono text-sm md:text-base text-foreground placeholder:text-muted-foreground resize-y focus:outline-none leading-relaxed min-h-[400px] md:min-h-[500px]"
+                  spellCheck={false}
+                />
+              </div>
+              <div className="flex gap-3">
+                <Button variant="hero" onClick={handleAnalyze} disabled={loading || !code.trim()} className="flex-1">
+                  {loading ? <Loader2 className="animate-spin" /> : <Play />}
+                  {loading ? "Analyzing..." : "Analyze"}
+                </Button>
+                <Button variant="hero-outline" onClick={() => setChatOpen(!chatOpen)} className="gap-2">
+                  <MessageSquare className="w-4 h-4" /> Chat
+                </Button>
+              </div>
             </motion.div>
-          </AnimatePresence>
-        </main>
-      </div>
+
+            {/* Output */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="rounded-lg border border-border bg-card/80 backdrop-blur-sm p-6 md:p-8 min-h-[500px] flex items-center justify-center overflow-y-auto max-h-[900px]"
+            >
+              <AnimatePresence mode="wait">
+                {loading ? (
+                  <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-center space-y-3">
+                    <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto" />
+                    <p className="text-sm text-muted-foreground font-mono">
+                      {isStreaming && streamText ? streamText : "AI is analyzing your code..."}
+                    </p>
+                    <div className="flex gap-1 justify-center">
+                      {[0, 1, 2].map((i) => (
+                        <motion.div key={i} className="w-1.5 h-1.5 rounded-full bg-primary" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }} />
+                      ))}
+                    </div>
+                  </motion.div>
+                ) : result ? (
+                  <motion.div key="result" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full space-y-5 font-mono text-sm">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs px-2 py-0.5 rounded bg-primary/20 text-primary border border-primary/30">{result.language}</span>
+                      <span className="text-xs px-2 py-0.5 rounded bg-accent/20 text-accent-foreground border border-border">
+                        {result.source === "llm-enhanced" ? "✨ AI Enhanced" : "Static Analysis"}
+                      </span>
+                      {result.code_quality_grade && (
+                        <span className={`text-xs px-2 py-0.5 rounded font-bold border ${
+                          result.code_quality_grade === "A" ? "bg-primary/20 text-primary border-primary/30" :
+                          result.code_quality_grade === "B" ? "bg-primary/10 text-primary border-primary/20" :
+                          result.code_quality_grade === "C" ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" :
+                          "bg-destructive/20 text-destructive border-destructive/30"
+                        }`}>
+                          Grade: {result.code_quality_grade}
+                        </span>
+                      )}
+                      <span className="text-xs text-muted-foreground ml-auto">Confidence: {Math.round(result.confidence_score * 100)}%</span>
+                    </div>
+
+                    {result.metrics && (
+                      <div className="flex gap-3 flex-wrap text-xs text-muted-foreground">
+                        <span>{result.metrics.code_lines} code lines</span><span>•</span>
+                        <span>{result.metrics.functions} functions</span><span>•</span>
+                        <span>{result.metrics.classes} classes</span><span>•</span>
+                        <span>{result.metrics.comment_ratio}% comments</span>
+                      </div>
+                    )}
+
+                    {result.highlights && result.highlights.length > 0 && (
+                      <div>
+                        <p className="text-primary text-xs mb-1 flex items-center gap-1">✅ STRENGTHS</p>
+                        <ul className="space-y-1">
+                          {result.highlights.map((h, i) => (
+                            <li key={i} className="text-muted-foreground flex items-start gap-2 text-xs">
+                              <span className="text-primary mt-0.5">✓</span> {h}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    <div>
+                      <p className="text-primary text-xs mb-1 flex items-center gap-1"><Brain className="w-3 h-3" /> GOAL</p>
+                      <p className="text-foreground">{result.goal}</p>
+                      {result.current_state && <p className="text-muted-foreground text-xs mt-1">{result.current_state}</p>}
+                    </div>
+
+                    <div>
+                      <p className="text-primary text-xs mb-1 flex items-center gap-1"><ChevronRight className="w-3 h-3" /> NEXT STEPS</p>
+                      <ul className="space-y-1">
+                        {result.next_steps.map((n, i) => (
+                          <motion.li key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }} className="text-foreground flex items-start gap-2">
+                            <span className="text-primary mt-0.5">▸</span> {n}
+                          </motion.li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {result.risks.length > 0 && (
+                      <div>
+                        <p className="text-primary text-xs mb-1 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> RISKS</p>
+                        <ul className="space-y-1">
+                          {result.risks.map((r, i) => (
+                            <li key={i} className="text-yellow-400/80 flex items-start gap-2"><span className="mt-0.5">⚠</span> {r}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {result.architectural_improvements?.length > 0 && (
+                      <div>
+                        <p className="text-primary text-xs mb-1 flex items-center gap-1"><Zap className="w-3 h-3" /> IMPROVEMENTS</p>
+                        <ul className="space-y-1">
+                          {result.architectural_improvements.map((a, i) => (
+                            <li key={i} className="text-foreground flex items-start gap-2"><span className="text-primary mt-0.5">◆</span> {a}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-primary text-xs">MOMENTUM</p>
+                        <p className="text-xs text-muted-foreground">
+                          Effort: <span className={
+                            result.effort_level === "High" ? "text-destructive" :
+                            result.effort_level === "Medium" ? "text-yellow-400" : "text-primary"
+                          }>{result.effort_level}</span>
+                        </p>
+                      </div>
+                      <div className="h-2 rounded-full bg-secondary overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${result.completion_percentage}%` }}
+                          transition={{ duration: 1, ease: "easeOut" }}
+                          className="h-full rounded-full"
+                          style={{ background: `linear-gradient(90deg, hsl(142 71% 45%), hsl(185 70% 50%))` }}
+                        />
+                      </div>
+                      <p className="text-muted-foreground text-xs mt-1">{result.completion_percentage}% complete</p>
+                    </div>
+
+                    <div className="flex gap-2 pt-2 border-t border-border">
+                      <Button variant="outline" size="sm" onClick={() => exportAsMarkdown({ ...result, code, created_at: new Date().toISOString() })} className="flex-1 text-xs">
+                        <FileText className="w-3 h-3" /> Export .md
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => exportAsPDF({ ...result, code, created_at: new Date().toISOString() })} className="flex-1 text-xs">
+                        <Download className="w-3 h-3" /> Export PDF
+                      </Button>
+                      <Button
+                        variant="hero"
+                        size="sm"
+                        disabled={suggestionsLoading}
+                        onClick={async () => {
+                          setSuggestionsLoading(true);
+                          setSuggestions([]);
+                          try {
+                            const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/suggest`, {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+                              body: JSON.stringify({ code, analysis: result }),
+                            });
+                            if (!resp.ok) { const err = await resp.json().catch(() => ({ error: "Failed" })); toast.error(err.error || "Failed to get suggestions"); return; }
+                            const data = await resp.json();
+                            setSuggestions(data.suggestions || []);
+                          } catch { toast.error("Failed to generate suggestions"); } finally { setSuggestionsLoading(false); }
+                        }}
+                        className="flex-1 text-xs"
+                      >
+                        {suggestionsLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                        {suggestionsLoading ? "Generating..." : "AI Fixes"}
+                      </Button>
+                    </div>
+
+                    <AnimatePresence>
+                      {suggestions.length > 0 && (
+                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="space-y-3 pt-2">
+                          <p className="text-primary text-xs flex items-center gap-1"><Sparkles className="w-3 h-3" /> AI SUGGESTIONS</p>
+                          {suggestions.map((s, i) => (
+                            <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }} className="rounded-md border border-border bg-background/50 p-3 space-y-2">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-xs font-semibold text-foreground">{s.title}</p>
+                                <button onClick={() => { navigator.clipboard.writeText(s.code); setCopiedIdx(i); setTimeout(() => setCopiedIdx(null), 2000); toast.success("Copied to clipboard!"); }} className="shrink-0 text-muted-foreground hover:text-primary transition-colors">
+                                  {copiedIdx === i ? <Check className="w-3.5 h-3.5 text-primary" /> : <Copy className="w-3.5 h-3.5" />}
+                                </button>
+                              </div>
+                              <pre className="text-[11px] text-muted-foreground bg-card/80 rounded p-2 overflow-x-auto max-h-32">{s.code}</pre>
+                              <p className="text-[11px] text-muted-foreground/80 italic">{s.explanation}</p>
+                            </motion.div>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
+                ) : (
+                  <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center space-y-3">
+                    <Brain className="w-10 h-10 text-primary/30 mx-auto" />
+                    <p className="text-muted-foreground text-sm font-mono">Paste code and hit Analyze for AI-powered results.</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          </div>
+        </div>
+      </main>
 
       {/* Chat Panel */}
       <AnimatePresence>
@@ -343,14 +574,14 @@ const Analysis = () => {
             }`}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/50 shrink-0">
-              <span className="text-sm font-semibold text-primary flex items-center gap-2 font-mono"><Bot className="w-4 h-4" /> AI Assistant</span>
+              <span className="text-sm font-semibold text-primary flex items-center gap-2"><Bot className="w-4 h-4" /> AI Code Assistant</span>
               <div className="flex items-center gap-1">
                 {chatMessages.length > 0 && (
                   <button onClick={() => setChatMessages([])} className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-secondary" title="Clear chat">
                     <RotateCcw className="w-3.5 h-3.5" />
                   </button>
                 )}
-                <button onClick={() => setChatExpanded(!chatExpanded)} className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-secondary">
+                <button onClick={() => setChatExpanded(!chatExpanded)} className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-secondary" title={chatExpanded ? "Minimize" : "Expand"}>
                   {chatExpanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
                 </button>
                 <button onClick={() => setChatOpen(false)} className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-secondary">
@@ -358,14 +589,15 @@ const Analysis = () => {
                 </button>
               </div>
             </div>
+
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {chatMessages.length === 0 && (
                 <div className="flex flex-col items-center justify-center h-full gap-4">
                   <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center"><Bot className="w-6 h-6 text-primary" /></div>
-                  <p className="text-sm text-muted-foreground text-center max-w-[200px]">Ask me anything about your code or analysis</p>
+                  <p className="text-sm text-muted-foreground text-center max-w-[200px]">Ask me anything about your code or analysis results</p>
                   <div className="grid grid-cols-1 gap-2 w-full max-w-[280px]">
                     {QUICK_PROMPTS.map((prompt, i) => (
-                      <motion.button key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }} onClick={() => setChatInput(prompt)} className="text-xs text-left px-3 py-2 rounded-lg border border-border hover:border-primary/40 hover:bg-primary/5 text-muted-foreground hover:text-foreground transition-all font-mono">
+                      <motion.button key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }} onClick={() => setChatInput(prompt)} className="text-xs text-left px-3 py-2 rounded-lg border border-border hover:border-primary/40 hover:bg-primary/5 text-muted-foreground hover:text-foreground transition-all">
                         {prompt}
                       </motion.button>
                     ))}
@@ -379,7 +611,7 @@ const Analysis = () => {
                   </div>
                   <div className={`max-w-[80%] rounded-xl px-3.5 py-2.5 text-sm ${m.role === "user" ? "bg-primary/15 text-foreground border border-primary/20" : "bg-secondary text-foreground border border-border"}`}>
                     {m.role === "assistant" ? (
-                      <div className="prose prose-sm prose-invert max-w-none [&_p]:mb-2 [&_p:last-child]:mb-0 [&_pre]:bg-card/80 [&_pre]:rounded-md [&_pre]:p-2 [&_pre]:text-xs [&_code]:text-primary [&_code]:text-xs">
+                      <div className="prose prose-sm prose-invert max-w-none [&_p]:mb-2 [&_p:last-child]:mb-0 [&_pre]:bg-card/80 [&_pre]:rounded-md [&_pre]:p-2 [&_pre]:text-xs [&_code]:text-primary [&_code]:text-xs [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5">
                         <ReactMarkdown>{m.content}</ReactMarkdown>
                       </div>
                     ) : (
@@ -402,13 +634,14 @@ const Analysis = () => {
               )}
               <div ref={chatEndRef} />
             </div>
+
             <div className="border-t border-border p-3 flex gap-2 shrink-0 bg-card/50">
               <input
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendChat()}
                 placeholder="Ask about your code..."
-                className="flex-1 bg-secondary/50 text-sm text-foreground placeholder:text-muted-foreground px-3 py-2.5 rounded-lg border border-border focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all font-mono"
+                className="flex-1 bg-secondary/50 text-sm text-foreground placeholder:text-muted-foreground px-3 py-2.5 rounded-lg border border-border focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
               />
               <Button variant="default" size="icon" onClick={sendChat} disabled={chatLoading || !chatInput.trim()} className="shrink-0 h-10 w-10 rounded-lg bg-primary hover:bg-primary/90">
                 <Send className="w-4 h-4" />
