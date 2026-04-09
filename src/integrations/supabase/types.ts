@@ -19,51 +19,69 @@ export type Database = {
           architectural_improvements: Json | null
           code: string
           completion_percentage: number | null
+          compliance_checks: Json | null
           confidence_score: number | null
           created_at: string
           current_state: string | null
+          dependency_audit: Json | null
           effort_level: string | null
           goal: string | null
           id: string
           issues: Json | null
           language: string | null
           next_steps: Json | null
+          project_name: string | null
           risks: Json | null
+          security_issues: Json | null
           source: string | null
+          total_files: number | null
+          total_size_bytes: number | null
           user_id: string
         }
         Insert: {
           architectural_improvements?: Json | null
           code: string
           completion_percentage?: number | null
+          compliance_checks?: Json | null
           confidence_score?: number | null
           created_at?: string
           current_state?: string | null
+          dependency_audit?: Json | null
           effort_level?: string | null
           goal?: string | null
           id?: string
           issues?: Json | null
           language?: string | null
           next_steps?: Json | null
+          project_name?: string | null
           risks?: Json | null
+          security_issues?: Json | null
           source?: string | null
+          total_files?: number | null
+          total_size_bytes?: number | null
           user_id: string
         }
         Update: {
           architectural_improvements?: Json | null
           code?: string
           completion_percentage?: number | null
+          compliance_checks?: Json | null
           confidence_score?: number | null
           created_at?: string
           current_state?: string | null
+          dependency_audit?: Json | null
           effort_level?: string | null
           goal?: string | null
           id?: string
           issues?: Json | null
           language?: string | null
           next_steps?: Json | null
+          project_name?: string | null
           risks?: Json | null
+          security_issues?: Json | null
           source?: string | null
+          total_files?: number | null
+          total_size_bytes?: number | null
           user_id?: string
         }
         Relationships: []
