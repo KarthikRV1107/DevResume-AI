@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Play, Loader2, Zap, AlertTriangle, Brain, ChevronRight, MessageSquare, Send, X, Upload, FileCode, Trash2, Download, FileText, Sparkles, Copy, Check, Bot, User, RotateCcw, Maximize2, Minimize2 } from "lucide-react";
+import { Play, Loader2, Zap, AlertTriangle, Brain, ChevronRight, MessageSquare, Send, X, Upload, FileCode, Trash2, Download, FileText, Sparkles, Copy, Check, Bot, User, RotateCcw, Maximize2, Minimize2, Shield, ShieldAlert, ShieldCheck, ShieldX, Package, Scale, FolderOpen, ChevronDown, ChevronUp } from "lucide-react";
 import { exportAsMarkdown, exportAsPDF } from "@/lib/exportAnalysis";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +9,36 @@ import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import Navbar from "@/components/Navbar";
 import Background3D from "@/components/Background3D";
+import { Progress } from "@/components/ui/progress";
+
+interface SecurityFinding {
+  id: string;
+  category: string;
+  severity: "critical" | "high" | "medium" | "low" | "info";
+  title: string;
+  description: string;
+  file?: string;
+  line?: number;
+  owasp?: string;
+  cwe?: string;
+  remediation: string;
+}
+
+interface DependencyFinding {
+  package: string;
+  version: string;
+  severity: "critical" | "high" | "medium" | "low";
+  issue: string;
+  recommendation: string;
+}
+
+interface ComplianceCheck {
+  framework: string;
+  control: string;
+  status: "pass" | "fail" | "warning" | "not_applicable";
+  description: string;
+  remediation?: string;
+}
 
 interface AnalysisResult {
   goal: string;
@@ -33,6 +63,10 @@ interface AnalysisResult {
     classes: number;
     imports: number;
   };
+  security_issues?: SecurityFinding[];
+  dependency_audit?: DependencyFinding[];
+  compliance_checks?: ComplianceCheck[];
+  security_summary?: { critical: number; high: number; medium: number; low: number; total: number };
 }
 
 type ChatMsg = { role: "user" | "assistant"; content: string };
@@ -42,6 +76,7 @@ const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 interface UploadedFile {
   name: string;
   content: string;
+  path?: string;
 }
 
 const ALLOWED_EXTENSIONS = [
@@ -49,17 +84,39 @@ const ALLOWED_EXTENSIONS = [
   ".h", ".hpp", ".cs", ".rb", ".php", ".swift", ".kt", ".scala", ".sh",
   ".bash", ".sql", ".html", ".css", ".scss", ".json", ".yaml", ".yml",
   ".toml", ".xml", ".md", ".txt", ".env", ".vue", ".svelte",
+  ".lock", ".config", ".cfg", ".ini", ".dockerfile", ".gitignore",
+  ".editorconfig", ".eslintrc", ".prettierrc", ".babelrc",
 ];
 
-const MAX_FILE_SIZE = 100 * 1024;
-const MAX_FILES = 10;
+const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB per file
+const MAX_FILES = 500;
+const MAX_TOTAL_SIZE = 50 * 1024 * 1024; // 50MB total
 
 const QUICK_PROMPTS = [
   "What's the biggest risk in this code?",
   "How can I improve performance?",
   "Suggest a better architecture",
-  "Explain the main issues found",
+  "What are the security vulnerabilities?",
 ];
+
+const severityColor = (severity: string) => {
+  switch (severity) {
+    case "critical": return "bg-red-500/20 text-red-400 border-red-500/30";
+    case "high": return "bg-orange-500/20 text-orange-400 border-orange-500/30";
+    case "medium": return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
+    case "low": return "bg-blue-500/20 text-blue-400 border-blue-500/30";
+    default: return "bg-muted text-muted-foreground border-border";
+  }
+};
+
+const complianceStatusIcon = (status: string) => {
+  switch (status) {
+    case "pass": return <ShieldCheck className="w-3.5 h-3.5 text-green-400" />;
+    case "fail": return <ShieldX className="w-3.5 h-3.5 text-red-400" />;
+    case "warning": return <ShieldAlert className="w-3.5 h-3.5 text-yellow-400" />;
+    default: return <Shield className="w-3.5 h-3.5 text-muted-foreground" />;
+  }
+};
 
 const Analysis = () => {
   const { user } = useAuth();
@@ -70,7 +127,11 @@ const Analysis = () => {
   const [isStreaming, setIsStreaming] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [projectName, setProjectName] = useState("");
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isProcessingFiles, setIsProcessingFiles] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
 
   const [suggestions, setSuggestions] = useState<{ title: string; code: string; explanation: string }[]>([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
@@ -83,49 +144,119 @@ const Analysis = () => {
   const [chatExpanded, setChatExpanded] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // Result section toggles
+  const [showSecurity, setShowSecurity] = useState(true);
+  const [showDependencies, setShowDependencies] = useState(false);
+  const [showCompliance, setShowCompliance] = useState(false);
+  const [activeResultTab, setActiveResultTab] = useState<"overview" | "security" | "dependencies" | "compliance">("overview");
+
   useEffect(() => {
-    if (chatOpen) {
-      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
+    if (chatOpen) chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages, chatOpen]);
 
   const processFiles = useCallback(async (files: FileList | File[]) => {
     const fileArray = Array.from(files);
+    setIsProcessingFiles(true);
+    setUploadProgress(0);
+
+    let totalSize = uploadedFiles.reduce((s, f) => s + f.content.length, 0);
     const totalAfter = uploadedFiles.length + fileArray.length;
+    
     if (totalAfter > MAX_FILES) {
-      toast.error(`Maximum ${MAX_FILES} files allowed`);
+      toast.error(`Maximum ${MAX_FILES} files allowed. Got ${totalAfter}.`);
+      setIsProcessingFiles(false);
       return;
     }
+
     const newFiles: UploadedFile[] = [];
+    let processed = 0;
+    let skipped = 0;
+
     for (const file of fileArray) {
+      processed++;
+      setUploadProgress(Math.round((processed / fileArray.length) * 100));
+
+      // Skip hidden files, node_modules, build artifacts
+      const path = (file as any).webkitRelativePath || file.name;
+      if (/node_modules|\.git\/|dist\/|build\/|\.next\/|__pycache__|\.pyc$|\.class$|\.exe$|\.dll$|\.so$|\.o$|\.a$|\.jar$|\.war$|\.zip$|\.tar|\.gz$|\.png$|\.jpg$|\.jpeg$|\.gif$|\.svg$|\.ico$|\.woff|\.ttf|\.eot$|\.mp4$|\.mp3$|\.mov$|\.avi$|\.pdf$|\.DS_Store|Thumbs\.db/i.test(path)) {
+        skipped++;
+        continue;
+      }
+
       const ext = "." + file.name.split(".").pop()?.toLowerCase();
-      if (!ALLOWED_EXTENSIONS.includes(ext)) {
-        toast.error(`Unsupported file type: ${file.name}`);
+      if (!ALLOWED_EXTENSIONS.includes(ext) && !file.name.includes(".")) {
+        skipped++;
         continue;
       }
+
       if (file.size > MAX_FILE_SIZE) {
-        toast.error(`File too large (>100KB): ${file.name}`);
+        skipped++;
         continue;
       }
+
+      if (totalSize + file.size > MAX_TOTAL_SIZE) {
+        toast.warning(`Reached ${Math.round(MAX_TOTAL_SIZE / 1024 / 1024)}MB limit. Some files skipped.`);
+        break;
+      }
+
       try {
         const content = await file.text();
-        newFiles.push({ name: file.name, content });
+        totalSize += content.length;
+        newFiles.push({ name: file.name, content, path });
+
+        // Auto-detect project name from folder
+        if (!projectName && path.includes("/")) {
+          setProjectName(path.split("/")[0]);
+        }
       } catch {
-        toast.error(`Failed to read: ${file.name}`);
+        skipped++;
       }
     }
+
     if (newFiles.length > 0) {
       const all = [...uploadedFiles, ...newFiles];
       setUploadedFiles(all);
-      const combined = all.map((f) => `// ═══ ${f.name} ═══\n${f.content}`).join("\n\n");
+      const combined = all.map((f) => `// ═══ ${f.path || f.name} ═══\n${f.content}`).join("\n\n");
       setCode(combined);
-      toast.success(`${newFiles.length} file(s) loaded`);
+      toast.success(`${newFiles.length} file(s) loaded${skipped > 0 ? ` (${skipped} skipped)` : ""}`);
+    } else if (skipped > 0) {
+      toast.warning(`All ${skipped} files were skipped (unsupported types or too large)`);
     }
-  }, [uploadedFiles]);
+
+    setIsProcessingFiles(false);
+    setUploadProgress(0);
+  }, [uploadedFiles, projectName]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
+    const items = e.dataTransfer.items;
+    if (items) {
+      const allFiles: File[] = [];
+      const traverseDir = async (entry: any): Promise<void> => {
+        if (entry.isFile) {
+          return new Promise((resolve) => {
+            entry.file((file: File) => { allFiles.push(file); resolve(); });
+          });
+        } else if (entry.isDirectory) {
+          const reader = entry.createReader();
+          return new Promise((resolve) => {
+            reader.readEntries(async (entries: any[]) => {
+              for (const e of entries) await traverseDir(e);
+              resolve();
+            });
+          });
+        }
+      };
+
+      const entries = Array.from(items).map((item: any) => item.webkitGetAsEntry?.()).filter(Boolean);
+      if (entries.length > 0) {
+        Promise.all(entries.map(traverseDir)).then(() => {
+          if (allFiles.length > 0) processFiles(allFiles);
+        });
+        return;
+      }
+    }
     if (e.dataTransfer.files.length > 0) processFiles(e.dataTransfer.files);
   }, [processFiles]);
 
@@ -135,12 +266,12 @@ const Analysis = () => {
   const removeFile = useCallback((index: number) => {
     const updated = uploadedFiles.filter((_, i) => i !== index);
     setUploadedFiles(updated);
-    if (updated.length === 0) { setCode(""); } else {
-      setCode(updated.map((f) => `// ═══ ${f.name} ═══\n${f.content}`).join("\n\n"));
+    if (updated.length === 0) { setCode(""); setProjectName(""); } else {
+      setCode(updated.map((f) => `// ═══ ${f.path || f.name} ═══\n${f.content}`).join("\n\n"));
     }
   }, [uploadedFiles]);
 
-  const clearAllFiles = useCallback(() => { setUploadedFiles([]); setCode(""); }, []);
+  const clearAllFiles = useCallback(() => { setUploadedFiles([]); setCode(""); setProjectName(""); }, []);
 
   const handleAnalyze = async () => {
     if (!code.trim()) return;
@@ -148,6 +279,7 @@ const Analysis = () => {
     setResult(null);
     setStreamText("");
     setIsStreaming(true);
+    setActiveResultTab("overview");
     try {
       const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze`, {
         method: "POST",
@@ -155,7 +287,13 @@ const Analysis = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ code, explanation_level: "Intermediate", stream: true }),
+        body: JSON.stringify({
+          code,
+          explanation_level: "Intermediate",
+          stream: true,
+          project_name: projectName || undefined,
+          total_files: uploadedFiles.length || undefined,
+        }),
       });
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({ error: "Analysis failed" }));
@@ -183,7 +321,7 @@ const Analysis = () => {
               const parsed = JSON.parse(jsonStr);
               if (parsed.type === "progress") setStreamText(parsed.message);
               else if (parsed.type === "result") finalResult = parsed.data;
-            } catch { }
+            } catch {}
           }
         }
         if (finalResult) {
@@ -191,7 +329,7 @@ const Analysis = () => {
           if (user) {
             supabase.from("analyses").insert({
               user_id: user.id,
-              code: code.slice(0, 10000),
+              code: code.slice(0, 50000),
               language: finalResult.language,
               goal: finalResult.goal,
               completion_percentage: finalResult.completion_percentage,
@@ -203,7 +341,13 @@ const Analysis = () => {
               confidence_score: finalResult.confidence_score,
               current_state: finalResult.current_state,
               source: finalResult.source,
-            }).then(({ error }) => {
+              security_issues: (finalResult.security_issues || []) as any,
+              dependency_audit: (finalResult.dependency_audit || []) as any,
+              compliance_checks: (finalResult.compliance_checks || []) as any,
+              project_name: projectName || null,
+              total_files: uploadedFiles.length || 0,
+              total_size_bytes: code.length,
+            } as any).then(({ error }) => {
               if (!error) toast.success("Analysis saved to history!");
             });
           }
@@ -241,14 +385,11 @@ const Analysis = () => {
     try {
       const contextMsg: ChatMsg = {
         role: "user",
-        content: `Context — the user is analyzing this code:\n\`\`\`\n${code.slice(0, 3000)}\n\`\`\`\n${result ? `Analysis result: ${JSON.stringify({ goal: result.goal, next_steps: result.next_steps, risks: result.risks })}` : ""}\n\nNow answer the user's question:`,
+        content: `Context — the user is analyzing this code:\n\`\`\`\n${code.slice(0, 3000)}\n\`\`\`\n${result ? `Analysis result: ${JSON.stringify({ goal: result.goal, next_steps: result.next_steps, risks: result.risks, security_issues: result.security_issues?.slice(0, 5) })}` : ""}\n\nNow answer the user's question:`,
       };
       const resp = await fetch(CHAT_URL, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
         body: JSON.stringify({ messages: [contextMsg, ...newMessages] }),
       });
       if (!resp.ok || !resp.body) throw new Error("Chat failed");
@@ -271,7 +412,7 @@ const Analysis = () => {
             const parsed = JSON.parse(jsonStr);
             const content = parsed.choices?.[0]?.delta?.content;
             if (content) upsertAssistant(content);
-          } catch { }
+          } catch {}
         }
       }
     } catch (e) {
@@ -283,43 +424,62 @@ const Analysis = () => {
     }
   }, [chatInput, chatMessages, chatLoading, code, result]);
 
+  const securitySummary = result?.security_summary;
+  const securityScore = securitySummary
+    ? Math.max(0, 100 - (securitySummary.critical * 25) - (securitySummary.high * 15) - (securitySummary.medium * 5) - (securitySummary.low * 1))
+    : null;
+
   return (
     <div className="min-h-screen scanline relative">
       <Background3D />
       <Navbar />
       <main className="pt-24 pb-16">
         <div className="container mx-auto px-4">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-12"
-          >
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-12">
             <h1 className="text-3xl md:text-5xl font-bold mb-4">
-              <span className="text-gradient">Analysis</span>
+              <span className="text-gradient">Enterprise Analysis</span>
             </h1>
-            <p className="text-muted-foreground max-w-lg mx-auto text-base md:text-lg">
-              Paste any unfinished code — watch AI recover your context in real time.
+            <p className="text-muted-foreground max-w-2xl mx-auto text-base md:text-lg">
+              Upload entire project folders — get deep code quality, security (OWASP Top 10), dependency audit, and compliance analysis.
             </p>
           </motion.div>
 
-          <div className={"grid md:grid-cols-2 gap-8 max-w-[90rem] mx-auto px-4"}>
+          <div className="grid md:grid-cols-2 gap-8 max-w-[90rem] mx-auto px-4">
             {/* Input */}
             <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
+              {/* Upload zone */}
               <div
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
-                onClick={() => fileInputRef.current?.click()}
-                className={`rounded-lg border-2 border-dashed p-4 text-center cursor-pointer transition-colors ${
+                className={`rounded-lg border-2 border-dashed p-6 text-center cursor-pointer transition-colors ${
                   isDragOver ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
                 }`}
               >
-                <Upload className="w-5 h-5 mx-auto mb-1 text-muted-foreground" />
-                <p className="text-xs text-muted-foreground">
-                  Drop files here or <span className="text-primary">browse</span>
+                <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground mb-2">
+                  Drop <span className="text-primary font-semibold">files or folders</span> here
                 </p>
-                <p className="text-[10px] text-muted-foreground/60 mt-1">
-                  .js .ts .py .go .rs .java .cpp + more · Max 100KB each · Up to 10 files
+                <div className="flex gap-2 justify-center">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
+                    className="text-xs"
+                  >
+                    <FileCode className="w-3.5 h-3.5 mr-1" /> Upload Files
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => { e.stopPropagation(); folderInputRef.current?.click(); }}
+                    className="text-xs"
+                  >
+                    <FolderOpen className="w-3.5 h-3.5 mr-1" /> Upload Folder
+                  </Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground/60 mt-2">
+                  Up to {MAX_FILES} files · {Math.round(MAX_FILE_SIZE / 1024 / 1024)}MB per file · {Math.round(MAX_TOTAL_SIZE / 1024 / 1024)}MB total · Auto-skips node_modules, images, binaries
                 </p>
                 <input
                   ref={fileInputRef}
@@ -329,38 +489,79 @@ const Analysis = () => {
                   className="hidden"
                   onChange={(e) => e.target.files && processFiles(e.target.files)}
                 />
+                <input
+                  ref={folderInputRef}
+                  type="file"
+                  multiple
+                  {...{ webkitdirectory: "", directory: "" } as any}
+                  className="hidden"
+                  onChange={(e) => e.target.files && processFiles(e.target.files)}
+                />
               </div>
 
-              {uploadedFiles.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {uploadedFiles.map((f, i) => (
-                    <span key={i} className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded bg-primary/10 text-primary border border-primary/20 font-mono">
-                      <FileCode className="w-3 h-3" />
-                      {f.name}
-                      <button onClick={(e) => { e.stopPropagation(); removeFile(i); }} className="hover:text-destructive transition-colors">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  ))}
-                  <button onClick={clearAllFiles} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded text-muted-foreground hover:text-destructive transition-colors">
-                    <Trash2 className="w-3 h-3" /> Clear all
-                  </button>
+              {/* Processing progress */}
+              {isProcessingFiles && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Processing files... {uploadProgress}%
+                  </div>
+                  <Progress value={uploadProgress} className="h-1.5" />
                 </div>
               )}
 
+              {/* Project name */}
+              {uploadedFiles.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <input
+                    value={projectName}
+                    onChange={(e) => setProjectName(e.target.value)}
+                    placeholder="Project name (auto-detected)"
+                    className="flex-1 bg-secondary/50 text-sm text-foreground placeholder:text-muted-foreground px-3 py-1.5 rounded border border-border focus:outline-none focus:border-primary/50"
+                  />
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    {uploadedFiles.length} files · {(code.length / 1024).toFixed(0)}KB
+                  </span>
+                </div>
+              )}
+
+              {/* File chips */}
+              {uploadedFiles.length > 0 && (
+                <div className="max-h-24 overflow-y-auto">
+                  <div className="flex flex-wrap gap-1.5">
+                    {uploadedFiles.slice(0, 50).map((f, i) => (
+                      <span key={i} className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 font-mono">
+                        <FileCode className="w-2.5 h-2.5" />
+                        {(f.path || f.name).split("/").pop()}
+                        <button onClick={(e) => { e.stopPropagation(); removeFile(i); }} className="hover:text-destructive transition-colors">
+                          <X className="w-2.5 h-2.5" />
+                        </button>
+                      </span>
+                    ))}
+                    {uploadedFiles.length > 50 && (
+                      <span className="text-[10px] text-muted-foreground px-1.5 py-0.5">+{uploadedFiles.length - 50} more</span>
+                    )}
+                    <button onClick={clearAllFiles} className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded text-muted-foreground hover:text-destructive transition-colors">
+                      <Trash2 className="w-2.5 h-2.5" /> Clear all
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Code editor */}
               <div className="rounded-lg border border-border bg-card/80 backdrop-blur-sm overflow-hidden">
                 <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-card/50">
                   <span className="w-3 h-3 rounded-full bg-destructive/70" />
                   <span className="w-3 h-3 rounded-full bg-yellow-500/70" />
                   <span className="w-3 h-3 rounded-full bg-primary/70" />
                   <span className="ml-2 text-xs text-muted-foreground font-mono">
-                    {uploadedFiles.length > 0 ? `${uploadedFiles.length} file(s)` : "editor"}
+                    {projectName || (uploadedFiles.length > 0 ? `${uploadedFiles.length} file(s)` : "editor")}
                   </span>
                 </div>
                 <textarea
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
-                  placeholder="Paste your unfinished code here or upload files above..."
+                  placeholder="Paste your code here, upload files, or drop an entire project folder above..."
                   className="w-full bg-transparent p-4 font-mono text-sm md:text-base text-foreground placeholder:text-muted-foreground resize-y focus:outline-none leading-relaxed min-h-[400px] md:min-h-[500px]"
                   spellCheck={false}
                 />
@@ -368,7 +569,7 @@ const Analysis = () => {
               <div className="flex gap-3">
                 <Button variant="hero" onClick={handleAnalyze} disabled={loading || !code.trim()} className="flex-1">
                   {loading ? <Loader2 className="animate-spin" /> : <Play />}
-                  {loading ? "Analyzing..." : "Analyze"}
+                  {loading ? "Analyzing..." : "Analyze Project"}
                 </Button>
                 <Button variant="hero-outline" onClick={() => setChatOpen(!chatOpen)} className="gap-2">
                   <MessageSquare className="w-4 h-4" /> Chat
@@ -380,14 +581,14 @@ const Analysis = () => {
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              className="rounded-lg border border-border bg-card/80 backdrop-blur-sm p-6 md:p-8 min-h-[500px] flex items-center justify-center overflow-y-auto max-h-[900px]"
+              className="rounded-lg border border-border bg-card/80 backdrop-blur-sm p-6 md:p-8 min-h-[500px] flex flex-col overflow-y-auto max-h-[1200px]"
             >
               <AnimatePresence mode="wait">
                 {loading ? (
-                  <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-center space-y-3">
+                  <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-center space-y-3 m-auto">
                     <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto" />
                     <p className="text-sm text-muted-foreground font-mono">
-                      {isStreaming && streamText ? streamText : "AI is analyzing your code..."}
+                      {isStreaming && streamText ? streamText : "AI is analyzing your project..."}
                     </p>
                     <div className="flex gap-1 justify-center">
                       {[0, 1, 2].map((i) => (
@@ -396,7 +597,8 @@ const Analysis = () => {
                     </div>
                   </motion.div>
                 ) : result ? (
-                  <motion.div key="result" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full space-y-5 font-mono text-sm">
+                  <motion.div key="result" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full space-y-4 font-mono text-sm flex-1">
+                    {/* Top badges */}
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs px-2 py-0.5 rounded bg-primary/20 text-primary border border-primary/30">{result.language}</span>
                       <span className="text-xs px-2 py-0.5 rounded bg-accent/20 text-accent-foreground border border-border">
@@ -408,96 +610,233 @@ const Analysis = () => {
                           result.code_quality_grade === "B" ? "bg-primary/10 text-primary border-primary/20" :
                           result.code_quality_grade === "C" ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" :
                           "bg-destructive/20 text-destructive border-destructive/30"
+                        }`}>Grade: {result.code_quality_grade}</span>
+                      )}
+                      {securityScore !== null && (
+                        <span className={`text-xs px-2 py-0.5 rounded font-bold border ${
+                          securityScore >= 80 ? "bg-green-500/20 text-green-400 border-green-500/30" :
+                          securityScore >= 50 ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" :
+                          "bg-red-500/20 text-red-400 border-red-500/30"
                         }`}>
-                          Grade: {result.code_quality_grade}
+                          <Shield className="w-3 h-3 inline mr-1" />Security: {securityScore}/100
                         </span>
                       )}
                       <span className="text-xs text-muted-foreground ml-auto">Confidence: {Math.round(result.confidence_score * 100)}%</span>
                     </div>
 
-                    {result.metrics && (
-                      <div className="flex gap-3 flex-wrap text-xs text-muted-foreground">
-                        <span>{result.metrics.code_lines} code lines</span><span>•</span>
-                        <span>{result.metrics.functions} functions</span><span>•</span>
-                        <span>{result.metrics.classes} classes</span><span>•</span>
-                        <span>{result.metrics.comment_ratio}% comments</span>
-                      </div>
-                    )}
-
-                    {result.highlights && result.highlights.length > 0 && (
-                      <div>
-                        <p className="text-primary text-xs mb-1 flex items-center gap-1">✅ STRENGTHS</p>
-                        <ul className="space-y-1">
-                          {result.highlights.map((h, i) => (
-                            <li key={i} className="text-muted-foreground flex items-start gap-2 text-xs">
-                              <span className="text-primary mt-0.5">✓</span> {h}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    <div>
-                      <p className="text-primary text-xs mb-1 flex items-center gap-1"><Brain className="w-3 h-3" /> GOAL</p>
-                      <p className="text-foreground">{result.goal}</p>
-                      {result.current_state && <p className="text-muted-foreground text-xs mt-1">{result.current_state}</p>}
+                    {/* Tab navigation */}
+                    <div className="flex gap-1 border-b border-border pb-1">
+                      {(["overview", "security", "dependencies", "compliance"] as const).map((tab) => (
+                        <button
+                          key={tab}
+                          onClick={() => setActiveResultTab(tab)}
+                          className={`text-[10px] uppercase tracking-wider px-3 py-1.5 rounded-t transition-colors ${
+                            activeResultTab === tab
+                              ? "bg-primary/20 text-primary border-b-2 border-primary"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {tab === "security" && securitySummary && securitySummary.total > 0 && (
+                            <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-500/20 text-red-400 text-[9px] mr-1">{securitySummary.total}</span>
+                          )}
+                          {tab}
+                        </button>
+                      ))}
                     </div>
 
-                    <div>
-                      <p className="text-primary text-xs mb-1 flex items-center gap-1"><ChevronRight className="w-3 h-3" /> NEXT STEPS</p>
-                      <ul className="space-y-1">
-                        {result.next_steps.map((n, i) => (
-                          <motion.li key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }} className="text-foreground flex items-start gap-2">
-                            <span className="text-primary mt-0.5">▸</span> {n}
-                          </motion.li>
-                        ))}
-                      </ul>
-                    </div>
+                    {/* Overview Tab */}
+                    {activeResultTab === "overview" && (
+                      <div className="space-y-4">
+                        {result.metrics && (
+                          <div className="flex gap-3 flex-wrap text-xs text-muted-foreground">
+                            <span>{result.metrics.code_lines} code lines</span><span>•</span>
+                            <span>{result.metrics.functions} functions</span><span>•</span>
+                            <span>{result.metrics.classes} classes</span><span>•</span>
+                            <span>{result.metrics.comment_ratio}% comments</span>
+                            {uploadedFiles.length > 0 && <><span>•</span><span>{uploadedFiles.length} files</span></>}
+                          </div>
+                        )}
 
-                    {result.risks.length > 0 && (
-                      <div>
-                        <p className="text-primary text-xs mb-1 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> RISKS</p>
-                        <ul className="space-y-1">
-                          {result.risks.map((r, i) => (
-                            <li key={i} className="text-yellow-400/80 flex items-start gap-2"><span className="mt-0.5">⚠</span> {r}</li>
-                          ))}
-                        </ul>
+                        {result.highlights && result.highlights.length > 0 && (
+                          <div>
+                            <p className="text-primary text-xs mb-1 flex items-center gap-1">✅ STRENGTHS</p>
+                            <ul className="space-y-1">
+                              {result.highlights.map((h, i) => (
+                                <li key={i} className="text-muted-foreground flex items-start gap-2 text-xs"><span className="text-primary mt-0.5">✓</span> {h}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        <div>
+                          <p className="text-primary text-xs mb-1 flex items-center gap-1"><Brain className="w-3 h-3" /> GOAL</p>
+                          <p className="text-foreground">{result.goal}</p>
+                          {result.current_state && <p className="text-muted-foreground text-xs mt-1">{result.current_state}</p>}
+                        </div>
+
+                        <div>
+                          <p className="text-primary text-xs mb-1 flex items-center gap-1"><ChevronRight className="w-3 h-3" /> NEXT STEPS</p>
+                          <ul className="space-y-1">
+                            {result.next_steps.map((n, i) => (
+                              <motion.li key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }} className="text-foreground flex items-start gap-2">
+                                <span className="text-primary mt-0.5">▸</span> {n}
+                              </motion.li>
+                            ))}
+                          </ul>
+                        </div>
+
+                        {result.risks.length > 0 && (
+                          <div>
+                            <p className="text-primary text-xs mb-1 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> RISKS</p>
+                            <ul className="space-y-1">
+                              {result.risks.map((r, i) => (
+                                <li key={i} className="text-yellow-400/80 flex items-start gap-2"><span className="mt-0.5">⚠</span> {r}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {result.architectural_improvements?.length > 0 && (
+                          <div>
+                            <p className="text-primary text-xs mb-1 flex items-center gap-1"><Zap className="w-3 h-3" /> IMPROVEMENTS</p>
+                            <ul className="space-y-1">
+                              {result.architectural_improvements.map((a, i) => (
+                                <li key={i} className="text-foreground flex items-start gap-2"><span className="text-primary mt-0.5">◆</span> {a}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <p className="text-primary text-xs">MOMENTUM</p>
+                            <p className="text-xs text-muted-foreground">
+                              Effort: <span className={result.effort_level === "High" ? "text-destructive" : result.effort_level === "Medium" ? "text-yellow-400" : "text-primary"}>{result.effort_level}</span>
+                            </p>
+                          </div>
+                          <div className="h-2 rounded-full bg-secondary overflow-hidden">
+                            <motion.div initial={{ width: 0 }} animate={{ width: `${result.completion_percentage}%` }} transition={{ duration: 1, ease: "easeOut" }} className="h-full rounded-full" style={{ background: `linear-gradient(90deg, hsl(142 71% 45%), hsl(185 70% 50%))` }} />
+                          </div>
+                          <p className="text-muted-foreground text-xs mt-1">{result.completion_percentage}% complete</p>
+                        </div>
                       </div>
                     )}
 
-                    {result.architectural_improvements?.length > 0 && (
-                      <div>
-                        <p className="text-primary text-xs mb-1 flex items-center gap-1"><Zap className="w-3 h-3" /> IMPROVEMENTS</p>
-                        <ul className="space-y-1">
-                          {result.architectural_improvements.map((a, i) => (
-                            <li key={i} className="text-foreground flex items-start gap-2"><span className="text-primary mt-0.5">◆</span> {a}</li>
-                          ))}
-                        </ul>
+                    {/* Security Tab */}
+                    {activeResultTab === "security" && (
+                      <div className="space-y-4">
+                        {securitySummary && (
+                          <div className="grid grid-cols-4 gap-2">
+                            {[
+                              { label: "Critical", count: securitySummary.critical, color: "text-red-400 bg-red-500/10 border-red-500/20" },
+                              { label: "High", count: securitySummary.high, color: "text-orange-400 bg-orange-500/10 border-orange-500/20" },
+                              { label: "Medium", count: securitySummary.medium, color: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20" },
+                              { label: "Low", count: securitySummary.low, color: "text-blue-400 bg-blue-500/10 border-blue-500/20" },
+                            ].map((s) => (
+                              <div key={s.label} className={`text-center rounded-lg border p-2 ${s.color}`}>
+                                <p className="text-lg font-bold">{s.count}</p>
+                                <p className="text-[10px] uppercase">{s.label}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {result.security_issues && result.security_issues.length > 0 ? (
+                          <div className="space-y-2">
+                            {result.security_issues.map((finding, i) => (
+                              <motion.div key={i} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} className="rounded-lg border border-border bg-background/50 p-3 space-y-1.5">
+                                <div className="flex items-start gap-2">
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded uppercase font-bold border ${severityColor(finding.severity)}`}>{finding.severity}</span>
+                                  <div className="flex-1">
+                                    <p className="text-xs font-semibold text-foreground">{finding.title}</p>
+                                    <p className="text-[11px] text-muted-foreground">{finding.description}</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-[10px] text-muted-foreground/70">{finding.category}</span>
+                                  {finding.owasp && <span className="text-[10px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">{finding.owasp}</span>}
+                                  {finding.cwe && <span className="text-[10px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">{finding.cwe}</span>}
+                                </div>
+                                <p className="text-[11px] text-primary/80">💡 {finding.remediation}</p>
+                              </motion.div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8">
+                            <ShieldCheck className="w-10 h-10 text-green-400 mx-auto mb-2" />
+                            <p className="text-sm text-muted-foreground">No security vulnerabilities detected!</p>
+                          </div>
+                        )}
                       </div>
                     )}
 
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-primary text-xs">MOMENTUM</p>
-                        <p className="text-xs text-muted-foreground">
-                          Effort: <span className={
-                            result.effort_level === "High" ? "text-destructive" :
-                            result.effort_level === "Medium" ? "text-yellow-400" : "text-primary"
-                          }>{result.effort_level}</span>
-                        </p>
+                    {/* Dependencies Tab */}
+                    {activeResultTab === "dependencies" && (
+                      <div className="space-y-3">
+                        {result.dependency_audit && result.dependency_audit.length > 0 ? (
+                          result.dependency_audit.map((dep, i) => (
+                            <div key={i} className="rounded-lg border border-border bg-background/50 p-3 space-y-1">
+                              <div className="flex items-center gap-2">
+                                <Package className="w-3.5 h-3.5 text-muted-foreground" />
+                                <span className="text-xs font-semibold text-foreground">{dep.package}</span>
+                                <span className="text-[10px] text-muted-foreground">v{dep.version}</span>
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded uppercase font-bold border ml-auto ${severityColor(dep.severity)}`}>{dep.severity}</span>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground">{dep.issue}</p>
+                              <p className="text-[11px] text-primary/80">💡 {dep.recommendation}</p>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-center py-8">
+                            <Package className="w-10 h-10 text-muted-foreground/30 mx-auto mb-2" />
+                            <p className="text-sm text-muted-foreground">No dependency issues found. Include package.json for audit.</p>
+                          </div>
+                        )}
                       </div>
-                      <div className="h-2 rounded-full bg-secondary overflow-hidden">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${result.completion_percentage}%` }}
-                          transition={{ duration: 1, ease: "easeOut" }}
-                          className="h-full rounded-full"
-                          style={{ background: `linear-gradient(90deg, hsl(142 71% 45%), hsl(185 70% 50%))` }}
-                        />
-                      </div>
-                      <p className="text-muted-foreground text-xs mt-1">{result.completion_percentage}% complete</p>
-                    </div>
+                    )}
 
+                    {/* Compliance Tab */}
+                    {activeResultTab === "compliance" && (
+                      <div className="space-y-3">
+                        {result.compliance_checks && result.compliance_checks.length > 0 ? (
+                          <>
+                            {["SOC2", "GDPR"].map((fw) => {
+                              const fwChecks = result.compliance_checks!.filter(c => c.framework === fw);
+                              if (fwChecks.length === 0) return null;
+                              const passCount = fwChecks.filter(c => c.status === "pass").length;
+                              return (
+                                <div key={fw}>
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <Scale className="w-3.5 h-3.5 text-primary" />
+                                    <span className="text-xs font-bold text-primary">{fw}</span>
+                                    <span className="text-[10px] text-muted-foreground ml-auto">{passCount}/{fwChecks.length} passing</span>
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    {fwChecks.map((check, i) => (
+                                      <div key={i} className="flex items-start gap-2 rounded border border-border bg-background/50 p-2">
+                                        {complianceStatusIcon(check.status)}
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-[11px] font-medium text-foreground">{check.control}</p>
+                                          <p className="text-[10px] text-muted-foreground">{check.description}</p>
+                                          {check.remediation && <p className="text-[10px] text-primary/70 mt-0.5">💡 {check.remediation}</p>}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </>
+                        ) : (
+                          <div className="text-center py-8">
+                            <Scale className="w-10 h-10 text-muted-foreground/30 mx-auto mb-2" />
+                            <p className="text-sm text-muted-foreground">No compliance data available.</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Export + AI Fixes */}
                     <div className="flex gap-2 pt-2 border-t border-border">
                       <Button variant="outline" size="sm" onClick={() => exportAsMarkdown({ ...result, code, created_at: new Date().toISOString() })} className="flex-1 text-xs">
                         <FileText className="w-3 h-3" /> Export .md
@@ -518,7 +857,7 @@ const Analysis = () => {
                               headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
                               body: JSON.stringify({ code, analysis: result }),
                             });
-                            if (!resp.ok) { const err = await resp.json().catch(() => ({ error: "Failed" })); toast.error(err.error || "Failed to get suggestions"); return; }
+                            if (!resp.ok) { const err = await resp.json().catch(() => ({ error: "Failed" })); toast.error(err.error || "Failed"); return; }
                             const data = await resp.json();
                             setSuggestions(data.suggestions || []);
                           } catch { toast.error("Failed to generate suggestions"); } finally { setSuggestionsLoading(false); }
@@ -538,7 +877,7 @@ const Analysis = () => {
                             <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }} className="rounded-md border border-border bg-background/50 p-3 space-y-2">
                               <div className="flex items-start justify-between gap-2">
                                 <p className="text-xs font-semibold text-foreground">{s.title}</p>
-                                <button onClick={() => { navigator.clipboard.writeText(s.code); setCopiedIdx(i); setTimeout(() => setCopiedIdx(null), 2000); toast.success("Copied to clipboard!"); }} className="shrink-0 text-muted-foreground hover:text-primary transition-colors">
+                                <button onClick={() => { navigator.clipboard.writeText(s.code); setCopiedIdx(i); setTimeout(() => setCopiedIdx(null), 2000); toast.success("Copied!"); }} className="shrink-0 text-muted-foreground hover:text-primary transition-colors">
                                   {copiedIdx === i ? <Check className="w-3.5 h-3.5 text-primary" /> : <Copy className="w-3.5 h-3.5" />}
                                 </button>
                               </div>
@@ -551,9 +890,9 @@ const Analysis = () => {
                     </AnimatePresence>
                   </motion.div>
                 ) : (
-                  <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center space-y-3">
+                  <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center space-y-3 m-auto">
                     <Brain className="w-10 h-10 text-primary/30 mx-auto" />
-                    <p className="text-muted-foreground text-sm font-mono">Paste code and hit Analyze for AI-powered results.</p>
+                    <p className="text-muted-foreground text-sm font-mono">Upload a project folder or paste code, then hit Analyze.</p>
                   </motion.div>
                 )}
               </AnimatePresence>
