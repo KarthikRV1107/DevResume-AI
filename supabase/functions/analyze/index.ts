@@ -138,10 +138,16 @@ function staticAnalyze(code: string, language: string): StaticIssue[] {
   if (funcStarts.length > 3 && docstrings + jsdoc === 0) issues.push({ type: "documentation", message: `${funcStarts.length} functions with no documentation — add docstrings/JSDoc`, severity: "info" });
 
   // Performance
-  if (/\bfor\b.*\bfor\b/s.test(code)) issues.push({ type: "performance", message: "Nested loops detected — may cause O(n²) performance", severity: "info" });
-  if (/\.forEach\(.*\.forEach\(/s.test(code)) issues.push({ type: "performance", message: "Nested forEach calls — consider restructuring for efficiency", severity: "info" });
+  if (/\bfor\b.*\bfor\b/s.test(code)) issues.push({ type: "performance", message: "Nested loops detected — may cause O(n²) performance", severity: "warning" });
+  if (/\.forEach\(.*\.forEach\(/s.test(code)) issues.push({ type: "performance", message: "Nested forEach calls — consider restructuring for efficiency", severity: "warning" });
   const domQueries = (code.match(/document\.(querySelector|getElementById|getElementsBy)/g) || []).length;
   if (domQueries > 5) issues.push({ type: "performance", message: `${domQueries} direct DOM queries — consider caching`, severity: "info" });
+  if (/new RegExp\(.*\+/.test(code)) issues.push({ type: "security", message: "Dynamic RegExp with user input — ReDoS risk", severity: "warning" });
+  if (/JSON\.parse\s*\(\s*(?!['"`])/.test(code) && !/try/.test(code)) issues.push({ type: "error_handling", message: "JSON.parse without try-catch — will throw on invalid input", severity: "warning" });
+  const anyCount = (code.match(/:\s*any\b/g) || []).length;
+  if (anyCount > 5) issues.push({ type: "naming", message: `${anyCount} uses of 'any' type — reduces type safety`, severity: "warning" });
+  if (/useEffect\(\s*(?:async|.*=>\s*{[^}]*(?:await|fetch|axios))/.test(code)) issues.push({ type: "performance", message: "Async operation directly in useEffect — use cleanup pattern", severity: "info" });
+  if (/(?:window|document)\.(?:addEventListener)/.test(code) && !/removeEventListener/.test(code)) issues.push({ type: "performance", message: "Event listener without cleanup — potential memory leak", severity: "warning" });
 
   // Duplicate code
   const normalizedLines = lines.map(l => l.trim()).filter(l => l.length > 20 && !l.startsWith("//") && !l.startsWith("#") && !l.startsWith("import") && !l.startsWith("from"));
@@ -149,6 +155,27 @@ function staticAnalyze(code: string, language: string): StaticIssue[] {
   for (const l of normalizedLines) lineCounts[l] = (lineCounts[l] || 0) + 1;
   const duplicateLines = Object.entries(lineCounts).filter(([, c]) => c >= 3).length;
   if (duplicateLines > 0) issues.push({ type: "complexity", message: `${duplicateLines} code pattern(s) repeated 3+ times — possible duplication`, severity: "warning" });
+
+  // File-level analysis for multi-file projects
+  const fileBlocks = code.split(/\/\/ ═══ .+ ═══/);
+  if (fileBlocks.length > 2) {
+    const fileHeaders = code.match(/\/\/ ═══ (.+?) ═══/g) || [];
+    if (fileHeaders.length > 20 && !code.includes("index.") && !code.includes("main.")) {
+      issues.push({ type: "complexity", message: "Large project with no clear entry point (index/main file)", severity: "info" });
+    }
+    const configFiles = fileHeaders.filter(h => /config|\.env|settings/i.test(h)).length;
+    if (configFiles === 0 && fileHeaders.length > 5) {
+      issues.push({ type: "complexity", message: "No configuration files detected — consider externalizing config", severity: "info" });
+    }
+    const testFiles = fileHeaders.filter(h => /\.test\.|\.spec\.|__test__|_test\./i.test(h)).length;
+    const srcFiles = fileHeaders.length - testFiles;
+    if (testFiles === 0 && srcFiles > 5) {
+      issues.push({ type: "documentation", message: `${srcFiles} source files with 0 test files — add unit tests`, severity: "warning" });
+    } else if (testFiles > 0 && srcFiles > 0) {
+      const ratio = Math.round((testFiles / srcFiles) * 100);
+      if (ratio < 30) issues.push({ type: "documentation", message: `Test coverage ratio: ${ratio}% (${testFiles}/${srcFiles} files) — aim for higher coverage`, severity: "info" });
+    }
+  }
 
   return issues;
 }
