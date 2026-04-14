@@ -138,10 +138,16 @@ function staticAnalyze(code: string, language: string): StaticIssue[] {
   if (funcStarts.length > 3 && docstrings + jsdoc === 0) issues.push({ type: "documentation", message: `${funcStarts.length} functions with no documentation — add docstrings/JSDoc`, severity: "info" });
 
   // Performance
-  if (/\bfor\b.*\bfor\b/s.test(code)) issues.push({ type: "performance", message: "Nested loops detected — may cause O(n²) performance", severity: "info" });
-  if (/\.forEach\(.*\.forEach\(/s.test(code)) issues.push({ type: "performance", message: "Nested forEach calls — consider restructuring for efficiency", severity: "info" });
+  if (/\bfor\b.*\bfor\b/s.test(code)) issues.push({ type: "performance", message: "Nested loops detected — may cause O(n²) performance", severity: "warning" });
+  if (/\.forEach\(.*\.forEach\(/s.test(code)) issues.push({ type: "performance", message: "Nested forEach calls — consider restructuring for efficiency", severity: "warning" });
   const domQueries = (code.match(/document\.(querySelector|getElementById|getElementsBy)/g) || []).length;
   if (domQueries > 5) issues.push({ type: "performance", message: `${domQueries} direct DOM queries — consider caching`, severity: "info" });
+  if (/new RegExp\(.*\+/.test(code)) issues.push({ type: "security", message: "Dynamic RegExp with user input — ReDoS risk", severity: "warning" });
+  if (/JSON\.parse\s*\(\s*(?!['"`])/.test(code) && !/try/.test(code)) issues.push({ type: "error_handling", message: "JSON.parse without try-catch — will throw on invalid input", severity: "warning" });
+  const anyCount = (code.match(/:\s*any\b/g) || []).length;
+  if (anyCount > 5) issues.push({ type: "naming", message: `${anyCount} uses of 'any' type — reduces type safety`, severity: "warning" });
+  if (/useEffect\(\s*(?:async|.*=>\s*{[^}]*(?:await|fetch|axios))/.test(code)) issues.push({ type: "performance", message: "Async operation directly in useEffect — use cleanup pattern", severity: "info" });
+  if (/(?:window|document)\.(?:addEventListener)/.test(code) && !/removeEventListener/.test(code)) issues.push({ type: "performance", message: "Event listener without cleanup — potential memory leak", severity: "warning" });
 
   // Duplicate code
   const normalizedLines = lines.map(l => l.trim()).filter(l => l.length > 20 && !l.startsWith("//") && !l.startsWith("#") && !l.startsWith("import") && !l.startsWith("from"));
@@ -149,6 +155,27 @@ function staticAnalyze(code: string, language: string): StaticIssue[] {
   for (const l of normalizedLines) lineCounts[l] = (lineCounts[l] || 0) + 1;
   const duplicateLines = Object.entries(lineCounts).filter(([, c]) => c >= 3).length;
   if (duplicateLines > 0) issues.push({ type: "complexity", message: `${duplicateLines} code pattern(s) repeated 3+ times — possible duplication`, severity: "warning" });
+
+  // File-level analysis for multi-file projects
+  const fileBlocks = code.split(/\/\/ ═══ .+ ═══/);
+  if (fileBlocks.length > 2) {
+    const fileHeaders = code.match(/\/\/ ═══ (.+?) ═══/g) || [];
+    if (fileHeaders.length > 20 && !code.includes("index.") && !code.includes("main.")) {
+      issues.push({ type: "complexity", message: "Large project with no clear entry point (index/main file)", severity: "info" });
+    }
+    const configFiles = fileHeaders.filter(h => /config|\.env|settings/i.test(h)).length;
+    if (configFiles === 0 && fileHeaders.length > 5) {
+      issues.push({ type: "complexity", message: "No configuration files detected — consider externalizing config", severity: "info" });
+    }
+    const testFiles = fileHeaders.filter(h => /\.test\.|\.spec\.|__test__|_test\./i.test(h)).length;
+    const srcFiles = fileHeaders.length - testFiles;
+    if (testFiles === 0 && srcFiles > 5) {
+      issues.push({ type: "documentation", message: `${srcFiles} source files with 0 test files — add unit tests`, severity: "warning" });
+    } else if (testFiles > 0 && srcFiles > 0) {
+      const ratio = Math.round((testFiles / srcFiles) * 100);
+      if (ratio < 30) issues.push({ type: "documentation", message: `Test coverage ratio: ${ratio}% (${testFiles}/${srcFiles} files) — aim for higher coverage`, severity: "info" });
+    }
+  }
 
   return issues;
 }
@@ -271,6 +298,14 @@ function enterpriseSecurityScan(code: string, language: string): SecurityFinding
     { regex: /xox[bpors]-[a-zA-Z0-9-]+/, title: "Slack token exposed", severity: "critical" as const },
     { regex: /-----BEGIN\s+(?:RSA|EC|DSA)?\s*PRIVATE\s+KEY-----/, title: "Private key in source code", severity: "critical" as const },
     { regex: /(?:mongodb|postgres|mysql):\/\/[^\s'"]+:[^\s'"]+@/, title: "Database connection string with credentials", severity: "critical" as const },
+    { regex: /AIza[0-9A-Za-z_-]{35}/, title: "Google API key exposed", severity: "critical" as const },
+    { regex: /ya29\.[0-9A-Za-z_-]+/, title: "Google OAuth token exposed", severity: "critical" as const },
+    { regex: /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/, title: "JWT token hardcoded in source", severity: "high" as const },
+    { regex: /SG\.[a-zA-Z0-9_-]{22}\.[a-zA-Z0-9_-]{43}/, title: "SendGrid API key exposed", severity: "critical" as const },
+    { regex: /sq0[a-z]{3}-[a-zA-Z0-9_-]{22,}/, title: "Square API key exposed", severity: "critical" as const },
+    { regex: /sk_live_[a-zA-Z0-9]{24,}/, title: "Stripe live secret key exposed", severity: "critical" as const },
+    { regex: /rk_live_[a-zA-Z0-9]{24,}/, title: "Stripe restricted key exposed", severity: "critical" as const },
+    { regex: /AAAA[A-Za-z0-9_-]{7}:[A-Za-z0-9_-]{140}/, title: "Firebase Cloud Messaging key exposed", severity: "critical" as const },
   ];
   for (const sp of secretPatterns) {
     for (let i = 0; i < lines.length; i++) {
@@ -528,7 +563,7 @@ Explanation Level: ${level}`;
     const userPrompt = `Analyze this ${detectedLang} code thoroughly (security + quality):
 
 \`\`\`${detectedLang.toLowerCase()}
-${code.slice(0, 30000)}
+${code.slice(0, 60000)}
 \`\`\``;
 
     const toolSchema = {
@@ -577,7 +612,7 @@ ${code.slice(0, 30000)}
                 method: "POST",
                 headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
                 body: JSON.stringify({
-                  model: "google/gemini-2.5-flash",
+                  model: "google/gemini-2.5-pro",
                   messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
                   tools: [toolSchema],
                   tool_choice: { type: "function", function: { name: "return_analysis" } },
@@ -653,7 +688,7 @@ ${code.slice(0, 30000)}
       method: "POST",
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-2.5-pro",
         messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
         tools: [toolSchema],
         tool_choice: { type: "function", function: { name: "return_analysis" } },

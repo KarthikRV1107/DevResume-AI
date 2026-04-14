@@ -1,6 +1,6 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Play, Loader2, Zap, AlertTriangle, Brain, ChevronRight, MessageSquare, Send, X, Upload, FileCode, Trash2, Download, FileText, Sparkles, Copy, Check, Bot, User, RotateCcw, Maximize2, Minimize2, Shield, ShieldAlert, ShieldCheck, ShieldX, Package, Scale, FolderOpen, ChevronDown, ChevronUp } from "lucide-react";
+import { Play, Loader2, Zap, AlertTriangle, Brain, ChevronRight, MessageSquare, Send, X, Upload, FileCode, Trash2, Download, FileText, Sparkles, Copy, Check, Bot, User, RotateCcw, Maximize2, Minimize2, Shield, ShieldAlert, ShieldCheck, ShieldX, Package, Scale, FolderOpen, ChevronDown, ChevronUp, Folder, File, Eye } from "lucide-react";
 import { exportAsMarkdown, exportAsPDF } from "@/lib/exportAnalysis";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +10,7 @@ import ReactMarkdown from "react-markdown";
 import Navbar from "@/components/Navbar";
 import Background3D from "@/components/Background3D";
 import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface SecurityFinding {
   id: string;
@@ -88,9 +89,9 @@ const ALLOWED_EXTENSIONS = [
   ".editorconfig", ".eslintrc", ".prettierrc", ".babelrc",
 ];
 
-const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB per file
+const MAX_FILE_SIZE = 2 * 1024 * 1024;
 const MAX_FILES = 500;
-const MAX_TOTAL_SIZE = 50 * 1024 * 1024; // 50MB total
+const MAX_TOTAL_SIZE = 50 * 1024 * 1024;
 
 const QUICK_PROMPTS = [
   "What's the biggest risk in this code?",
@@ -118,6 +119,126 @@ const complianceStatusIcon = (status: string) => {
   }
 };
 
+// ─── File Tree Types ──────────────────────────────────────────────────
+interface TreeNode {
+  name: string;
+  path: string;
+  type: "file" | "folder";
+  children?: TreeNode[];
+  fileIndex?: number;
+}
+
+function buildFileTree(files: UploadedFile[]): TreeNode[] {
+  const root: TreeNode[] = [];
+  
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const parts = (file.path || file.name).split("/").filter(Boolean);
+    let current = root;
+    
+    for (let j = 0; j < parts.length; j++) {
+      const part = parts[j];
+      const isFile = j === parts.length - 1;
+      const existing = current.find(n => n.name === part && n.type === (isFile ? "file" : "folder"));
+      
+      if (existing) {
+        if (!isFile && existing.children) {
+          current = existing.children;
+        }
+      } else {
+        const node: TreeNode = {
+          name: part,
+          path: parts.slice(0, j + 1).join("/"),
+          type: isFile ? "file" : "folder",
+          ...(isFile ? { fileIndex: i } : { children: [] }),
+        };
+        current.push(node);
+        if (!isFile && node.children) {
+          current = node.children;
+        }
+      }
+    }
+  }
+  
+  // Sort: folders first, then files, alphabetically
+  const sortTree = (nodes: TreeNode[]) => {
+    nodes.sort((a, b) => {
+      if (a.type !== b.type) return a.type === "folder" ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+    nodes.forEach(n => { if (n.children) sortTree(n.children); });
+  };
+  sortTree(root);
+  return root;
+}
+
+const getFileIcon = (name: string) => {
+  const ext = name.split(".").pop()?.toLowerCase() || "";
+  const colors: Record<string, string> = {
+    ts: "text-blue-400", tsx: "text-blue-400", js: "text-yellow-400", jsx: "text-yellow-400",
+    py: "text-green-400", go: "text-cyan-400", rs: "text-orange-400", java: "text-red-400",
+    json: "text-yellow-300", yaml: "text-pink-400", yml: "text-pink-400", md: "text-muted-foreground",
+    css: "text-purple-400", scss: "text-purple-400", html: "text-orange-300",
+    sql: "text-blue-300", sh: "text-green-300", env: "text-yellow-200",
+  };
+  return colors[ext] || "text-muted-foreground";
+};
+
+function FileTreeNode({ node, selectedFile, onSelectFile, expandedFolders, onToggleFolder, depth = 0 }: {
+  node: TreeNode;
+  selectedFile: number | null;
+  onSelectFile: (index: number) => void;
+  expandedFolders: Set<string>;
+  onToggleFolder: (path: string) => void;
+  depth?: number;
+}) {
+  const isExpanded = expandedFolders.has(node.path);
+  const isSelected = node.type === "file" && node.fileIndex === selectedFile;
+
+  return (
+    <div>
+      <button
+        onClick={() => {
+          if (node.type === "folder") onToggleFolder(node.path);
+          else if (node.fileIndex !== undefined) onSelectFile(node.fileIndex);
+        }}
+        className={`w-full flex items-center gap-1.5 px-2 py-1 text-[11px] font-mono hover:bg-primary/10 transition-colors rounded-sm ${
+          isSelected ? "bg-primary/20 text-primary" : "text-foreground/80"
+        }`}
+        style={{ paddingLeft: `${depth * 12 + 8}px` }}
+      >
+        {node.type === "folder" ? (
+          <>
+            <ChevronRight className={`w-3 h-3 transition-transform shrink-0 ${isExpanded ? "rotate-90" : ""}`} />
+            <Folder className={`w-3.5 h-3.5 shrink-0 ${isExpanded ? "text-primary" : "text-muted-foreground"}`} />
+          </>
+        ) : (
+          <>
+            <span className="w-3" />
+            <File className={`w-3.5 h-3.5 shrink-0 ${getFileIcon(node.name)}`} />
+          </>
+        )}
+        <span className="truncate">{node.name}</span>
+      </button>
+      {node.type === "folder" && isExpanded && node.children && (
+        <div>
+          {node.children.map((child) => (
+            <FileTreeNode
+              key={child.path}
+              node={child}
+              selectedFile={selectedFile}
+              onSelectFile={onSelectFile}
+              expandedFolders={expandedFolders}
+              onToggleFolder={onToggleFolder}
+              depth={depth + 1}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const Analysis = () => {
   const { user } = useAuth();
   const [code, setCode] = useState("");
@@ -133,6 +254,11 @@ const Analysis = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
 
+  // File tree state
+  const [selectedFileIndex, setSelectedFileIndex] = useState<number | null>(null);
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [showAllFiles, setShowAllFiles] = useState(false); // false = viewing single file, true = all combined
+
   const [suggestions, setSuggestions] = useState<{ title: string; code: string; explanation: string }[]>([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
@@ -144,15 +270,49 @@ const Analysis = () => {
   const [chatExpanded, setChatExpanded] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Result section toggles
-  const [showSecurity, setShowSecurity] = useState(true);
-  const [showDependencies, setShowDependencies] = useState(false);
-  const [showCompliance, setShowCompliance] = useState(false);
   const [activeResultTab, setActiveResultTab] = useState<"overview" | "security" | "dependencies" | "compliance">("overview");
+
+  const fileTree = useMemo(() => buildFileTree(uploadedFiles), [uploadedFiles]);
+
+  const editorContent = useMemo(() => {
+    if (uploadedFiles.length === 0) return code;
+    if (selectedFileIndex !== null && !showAllFiles) {
+      return uploadedFiles[selectedFileIndex]?.content || "";
+    }
+    return uploadedFiles.map((f) => `// ═══ ${f.path || f.name} ═══\n${f.content}`).join("\n\n");
+  }, [code, uploadedFiles, selectedFileIndex, showAllFiles]);
+
+  const combinedCode = useMemo(() => {
+    if (uploadedFiles.length === 0) return code;
+    return uploadedFiles.map((f) => `// ═══ ${f.path || f.name} ═══\n${f.content}`).join("\n\n");
+  }, [code, uploadedFiles]);
 
   useEffect(() => {
     if (chatOpen) chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages, chatOpen]);
+
+  const toggleFolder = useCallback((path: string) => {
+    setExpandedFolders(prev => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  }, []);
+
+  const expandAllFolders = useCallback(() => {
+    const allPaths = new Set<string>();
+    const collect = (nodes: TreeNode[]) => {
+      nodes.forEach(n => {
+        if (n.type === "folder") {
+          allPaths.add(n.path);
+          if (n.children) collect(n.children);
+        }
+      });
+    };
+    collect(fileTree);
+    setExpandedFolders(allPaths);
+  }, [fileTree]);
 
   const processFiles = useCallback(async (files: FileList | File[]) => {
     const fileArray = Array.from(files);
@@ -176,7 +336,6 @@ const Analysis = () => {
       processed++;
       setUploadProgress(Math.round((processed / fileArray.length) * 100));
 
-      // Skip hidden files, node_modules, build artifacts
       const path = (file as any).webkitRelativePath || file.name;
       if (/node_modules|\.git\/|dist\/|build\/|\.next\/|__pycache__|\.pyc$|\.class$|\.exe$|\.dll$|\.so$|\.o$|\.a$|\.jar$|\.war$|\.zip$|\.tar|\.gz$|\.png$|\.jpg$|\.jpeg$|\.gif$|\.svg$|\.ico$|\.woff|\.ttf|\.eot$|\.mp4$|\.mp3$|\.mov$|\.avi$|\.pdf$|\.DS_Store|Thumbs\.db/i.test(path)) {
         skipped++;
@@ -204,7 +363,6 @@ const Analysis = () => {
         totalSize += content.length;
         newFiles.push({ name: file.name, content, path });
 
-        // Auto-detect project name from folder
         if (!projectName && path.includes("/")) {
           setProjectName(path.split("/")[0]);
         }
@@ -218,6 +376,15 @@ const Analysis = () => {
       setUploadedFiles(all);
       const combined = all.map((f) => `// ═══ ${f.path || f.name} ═══\n${f.content}`).join("\n\n");
       setCode(combined);
+      setSelectedFileIndex(0);
+      setShowAllFiles(false);
+      // Auto-expand first-level folders
+      const firstLevelFolders = new Set<string>();
+      all.forEach(f => {
+        const parts = (f.path || f.name).split("/");
+        if (parts.length > 1) firstLevelFolders.add(parts[0]);
+      });
+      setExpandedFolders(firstLevelFolders);
       toast.success(`${newFiles.length} file(s) loaded${skipped > 0 ? ` (${skipped} skipped)` : ""}`);
     } else if (skipped > 0) {
       toast.warning(`All ${skipped} files were skipped (unsupported types or too large)`);
@@ -266,15 +433,17 @@ const Analysis = () => {
   const removeFile = useCallback((index: number) => {
     const updated = uploadedFiles.filter((_, i) => i !== index);
     setUploadedFiles(updated);
-    if (updated.length === 0) { setCode(""); setProjectName(""); } else {
+    if (updated.length === 0) { setCode(""); setProjectName(""); setSelectedFileIndex(null); } else {
       setCode(updated.map((f) => `// ═══ ${f.path || f.name} ═══\n${f.content}`).join("\n\n"));
+      if (selectedFileIndex !== null && selectedFileIndex >= updated.length) setSelectedFileIndex(updated.length - 1);
     }
-  }, [uploadedFiles]);
+  }, [uploadedFiles, selectedFileIndex]);
 
-  const clearAllFiles = useCallback(() => { setUploadedFiles([]); setCode(""); setProjectName(""); }, []);
+  const clearAllFiles = useCallback(() => { setUploadedFiles([]); setCode(""); setProjectName(""); setSelectedFileIndex(null); setExpandedFolders(new Set()); }, []);
 
   const handleAnalyze = async () => {
-    if (!code.trim()) return;
+    const analyzeCode = combinedCode.trim() || code.trim();
+    if (!analyzeCode) return;
     setLoading(true);
     setResult(null);
     setStreamText("");
@@ -288,7 +457,7 @@ const Analysis = () => {
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
         body: JSON.stringify({
-          code,
+          code: analyzeCode,
           explanation_level: "Intermediate",
           stream: true,
           project_name: projectName || undefined,
@@ -329,7 +498,7 @@ const Analysis = () => {
           if (user) {
             supabase.from("analyses").insert({
               user_id: user.id,
-              code: code.slice(0, 50000),
+              code: analyzeCode.slice(0, 50000),
               language: finalResult.language,
               goal: finalResult.goal,
               completion_percentage: finalResult.completion_percentage,
@@ -346,7 +515,7 @@ const Analysis = () => {
               compliance_checks: (finalResult.compliance_checks || []) as any,
               project_name: projectName || null,
               total_files: uploadedFiles.length || 0,
-              total_size_bytes: code.length,
+              total_size_bytes: analyzeCode.length,
             } as any).then(({ error }) => {
               if (!error) toast.success("Analysis saved to history!");
             });
@@ -385,7 +554,7 @@ const Analysis = () => {
     try {
       const contextMsg: ChatMsg = {
         role: "user",
-        content: `Context — the user is analyzing this code:\n\`\`\`\n${code.slice(0, 3000)}\n\`\`\`\n${result ? `Analysis result: ${JSON.stringify({ goal: result.goal, next_steps: result.next_steps, risks: result.risks, security_issues: result.security_issues?.slice(0, 5) })}` : ""}\n\nNow answer the user's question:`,
+        content: `Context — the user is analyzing this code:\n\`\`\`\n${combinedCode.slice(0, 3000)}\n\`\`\`\n${result ? `Analysis result: ${JSON.stringify({ goal: result.goal, next_steps: result.next_steps, risks: result.risks, security_issues: result.security_issues?.slice(0, 5) })}` : ""}\n\nNow answer the user's question:`,
       };
       const resp = await fetch(CHAT_URL, {
         method: "POST",
@@ -422,12 +591,14 @@ const Analysis = () => {
       setChatLoading(false);
       setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
     }
-  }, [chatInput, chatMessages, chatLoading, code, result]);
+  }, [chatInput, chatMessages, chatLoading, combinedCode, result]);
 
   const securitySummary = result?.security_summary;
   const securityScore = securitySummary
     ? Math.max(0, 100 - (securitySummary.critical * 25) - (securitySummary.high * 15) - (securitySummary.medium * 5) - (securitySummary.low * 1))
     : null;
+
+  const selectedFileName = selectedFileIndex !== null ? (uploadedFiles[selectedFileIndex]?.path || uploadedFiles[selectedFileIndex]?.name || "editor") : "editor";
 
   return (
     <div className="min-h-screen scanline relative">
@@ -435,7 +606,7 @@ const Analysis = () => {
       <Navbar />
       <main className="pt-24 pb-16">
         <div className="container mx-auto px-4">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-12">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
             <h1 className="text-3xl md:text-5xl font-bold mb-4">
               <span className="text-gradient">Enterprise Analysis</span>
             </h1>
@@ -444,130 +615,146 @@ const Analysis = () => {
             </p>
           </motion.div>
 
-          <div className="grid md:grid-cols-2 gap-8 max-w-[90rem] mx-auto px-4">
-            {/* Input */}
-            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
-              {/* Upload zone */}
-              <div
-                onDrop={handleDrop}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                className={`rounded-lg border-2 border-dashed p-6 text-center cursor-pointer transition-colors ${
-                  isDragOver ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
-                }`}
-              >
-                <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground mb-2">
+          {/* Upload zone (always visible at top) */}
+          <div className="max-w-[90rem] mx-auto px-4 mb-6">
+            <div
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              className={`rounded-lg border-2 border-dashed p-4 text-center cursor-pointer transition-colors ${
+                isDragOver ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+              }`}
+            >
+              <div className="flex items-center justify-center gap-4 flex-wrap">
+                <Upload className="w-6 h-6 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
                   Drop <span className="text-primary font-semibold">files or folders</span> here
                 </p>
-                <div className="flex gap-2 justify-center">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
-                    className="text-xs"
-                  >
-                    <FileCode className="w-3.5 h-3.5 mr-1" /> Upload Files
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }} className="text-xs">
+                    <FileCode className="w-3.5 h-3.5 mr-1" /> Files
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => { e.stopPropagation(); folderInputRef.current?.click(); }}
-                    className="text-xs"
-                  >
-                    <FolderOpen className="w-3.5 h-3.5 mr-1" /> Upload Folder
+                  <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); folderInputRef.current?.click(); }} className="text-xs">
+                    <FolderOpen className="w-3.5 h-3.5 mr-1" /> Folder
                   </Button>
                 </div>
-                <p className="text-[10px] text-muted-foreground/60 mt-2">
-                  Up to {MAX_FILES} files · {Math.round(MAX_FILE_SIZE / 1024 / 1024)}MB per file · {Math.round(MAX_TOTAL_SIZE / 1024 / 1024)}MB total · Auto-skips node_modules, images, binaries
+                <p className="text-[10px] text-muted-foreground/60">
+                  {MAX_FILES} files · {Math.round(MAX_FILE_SIZE / 1024 / 1024)}MB/file · {Math.round(MAX_TOTAL_SIZE / 1024 / 1024)}MB total
                 </p>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  accept={ALLOWED_EXTENSIONS.join(",")}
-                  className="hidden"
-                  onChange={(e) => e.target.files && processFiles(e.target.files)}
-                />
-                <input
-                  ref={folderInputRef}
-                  type="file"
-                  multiple
-                  {...{ webkitdirectory: "", directory: "" } as any}
-                  className="hidden"
-                  onChange={(e) => e.target.files && processFiles(e.target.files)}
-                />
               </div>
+              <input ref={fileInputRef} type="file" multiple accept={ALLOWED_EXTENSIONS.join(",")} className="hidden" onChange={(e) => e.target.files && processFiles(e.target.files)} />
+              <input ref={folderInputRef} type="file" multiple {...{ webkitdirectory: "", directory: "" } as any} className="hidden" onChange={(e) => e.target.files && processFiles(e.target.files)} />
+            </div>
 
-              {/* Processing progress */}
-              {isProcessingFiles && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    Processing files... {uploadProgress}%
-                  </div>
-                  <Progress value={uploadProgress} className="h-1.5" />
+            {isProcessingFiles && (
+              <div className="mt-2 space-y-1">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Processing files... {uploadProgress}%
                 </div>
-              )}
+                <Progress value={uploadProgress} className="h-1.5" />
+              </div>
+            )}
 
-              {/* Project name */}
-              {uploadedFiles.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <input
-                    value={projectName}
-                    onChange={(e) => setProjectName(e.target.value)}
-                    placeholder="Project name (auto-detected)"
-                    className="flex-1 bg-secondary/50 text-sm text-foreground placeholder:text-muted-foreground px-3 py-1.5 rounded border border-border focus:outline-none focus:border-primary/50"
-                  />
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    {uploadedFiles.length} files · {(code.length / 1024).toFixed(0)}KB
-                  </span>
-                </div>
-              )}
+            {uploadedFiles.length > 0 && (
+              <div className="flex items-center gap-2 mt-3">
+                <input
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  placeholder="Project name (auto-detected)"
+                  className="flex-1 bg-secondary/50 text-sm text-foreground placeholder:text-muted-foreground px-3 py-1.5 rounded border border-border focus:outline-none focus:border-primary/50"
+                />
+                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                  {uploadedFiles.length} files · {(combinedCode.length / 1024).toFixed(0)}KB
+                </span>
+                <button onClick={clearAllFiles} className="text-xs text-muted-foreground hover:text-destructive transition-colors flex items-center gap-1">
+                  <Trash2 className="w-3 h-3" /> Clear
+                </button>
+              </div>
+            )}
+          </div>
 
-              {/* File chips */}
-              {uploadedFiles.length > 0 && (
-                <div className="max-h-24 overflow-y-auto">
-                  <div className="flex flex-wrap gap-1.5">
-                    {uploadedFiles.slice(0, 50).map((f, i) => (
-                      <span key={i} className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 font-mono">
-                        <FileCode className="w-2.5 h-2.5" />
-                        {(f.path || f.name).split("/").pop()}
-                        <button onClick={(e) => { e.stopPropagation(); removeFile(i); }} className="hover:text-destructive transition-colors">
-                          <X className="w-2.5 h-2.5" />
-                        </button>
-                      </span>
-                    ))}
-                    {uploadedFiles.length > 50 && (
-                      <span className="text-[10px] text-muted-foreground px-1.5 py-0.5">+{uploadedFiles.length - 50} more</span>
-                    )}
-                    <button onClick={clearAllFiles} className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded text-muted-foreground hover:text-destructive transition-colors">
-                      <Trash2 className="w-2.5 h-2.5" /> Clear all
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Code editor */}
+          <div className="grid md:grid-cols-2 gap-6 max-w-[90rem] mx-auto px-4">
+            {/* Input: File Tree + Editor */}
+            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
               <div className="rounded-lg border border-border bg-card/80 backdrop-blur-sm overflow-hidden">
+                {/* Editor header */}
                 <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-card/50">
                   <span className="w-3 h-3 rounded-full bg-destructive/70" />
                   <span className="w-3 h-3 rounded-full bg-yellow-500/70" />
                   <span className="w-3 h-3 rounded-full bg-primary/70" />
-                  <span className="ml-2 text-xs text-muted-foreground font-mono">
-                    {projectName || (uploadedFiles.length > 0 ? `${uploadedFiles.length} file(s)` : "editor")}
+                  <span className="ml-2 text-xs text-muted-foreground font-mono truncate flex-1">
+                    {showAllFiles ? `All Files (${uploadedFiles.length})` : selectedFileName}
                   </span>
+                  {uploadedFiles.length > 0 && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => { setShowAllFiles(false); if (selectedFileIndex === null) setSelectedFileIndex(0); }}
+                        className={`text-[10px] px-2 py-0.5 rounded transition-colors ${!showAllFiles ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                      >
+                        Single
+                      </button>
+                      <button
+                        onClick={() => setShowAllFiles(true)}
+                        className={`text-[10px] px-2 py-0.5 rounded transition-colors ${showAllFiles ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                      >
+                        All
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <textarea
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  placeholder="Paste your code here, upload files, or drop an entire project folder above..."
-                  className="w-full bg-transparent p-4 font-mono text-sm md:text-base text-foreground placeholder:text-muted-foreground resize-y focus:outline-none leading-relaxed min-h-[400px] md:min-h-[500px]"
-                  spellCheck={false}
-                />
+
+                <div className="flex" style={{ minHeight: "500px" }}>
+                  {/* File tree sidebar */}
+                  {uploadedFiles.length > 0 && (
+                    <div className="w-48 md:w-56 border-r border-border bg-card/30 flex flex-col shrink-0">
+                      <div className="flex items-center justify-between px-2 py-1.5 border-b border-border/50">
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Explorer</span>
+                        <button onClick={expandAllFolders} className="text-[10px] text-muted-foreground hover:text-primary transition-colors" title="Expand all">
+                          <FolderOpen className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <ScrollArea className="flex-1">
+                        <div className="py-1">
+                          {fileTree.map((node) => (
+                            <FileTreeNode
+                              key={node.path}
+                              node={node}
+                              selectedFile={selectedFileIndex}
+                              onSelectFile={(i) => { setSelectedFileIndex(i); setShowAllFiles(false); }}
+                              expandedFolders={expandedFolders}
+                              onToggleFolder={toggleFolder}
+                            />
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  )}
+
+                  {/* Code editor */}
+                  <div className="flex-1 min-w-0">
+                    <textarea
+                      value={editorContent}
+                      onChange={(e) => {
+                        if (uploadedFiles.length > 0 && selectedFileIndex !== null && !showAllFiles) {
+                          const updated = [...uploadedFiles];
+                          updated[selectedFileIndex] = { ...updated[selectedFileIndex], content: e.target.value };
+                          setUploadedFiles(updated);
+                          setCode(updated.map((f) => `// ═══ ${f.path || f.name} ═══\n${f.content}`).join("\n\n"));
+                        } else {
+                          setCode(e.target.value);
+                        }
+                      }}
+                      placeholder="Paste your code here, upload files, or drop an entire project folder above..."
+                      className="w-full h-full bg-transparent p-4 font-mono text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none leading-relaxed"
+                      style={{ minHeight: "500px" }}
+                      spellCheck={false}
+                    />
+                  </div>
+                </div>
               </div>
+
               <div className="flex gap-3">
-                <Button variant="hero" onClick={handleAnalyze} disabled={loading || !code.trim()} className="flex-1">
+                <Button variant="hero" onClick={handleAnalyze} disabled={loading || (!code.trim() && !combinedCode.trim())} className="flex-1">
                   {loading ? <Loader2 className="animate-spin" /> : <Play />}
                   {loading ? "Analyzing..." : "Analyze Project"}
                 </Button>
@@ -838,10 +1025,10 @@ const Analysis = () => {
 
                     {/* Export + AI Fixes */}
                     <div className="flex gap-2 pt-2 border-t border-border">
-                      <Button variant="outline" size="sm" onClick={() => exportAsMarkdown({ ...result, code, created_at: new Date().toISOString() })} className="flex-1 text-xs">
+                      <Button variant="outline" size="sm" onClick={() => exportAsMarkdown({ ...result, code: combinedCode, created_at: new Date().toISOString() })} className="flex-1 text-xs">
                         <FileText className="w-3 h-3" /> Export .md
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => exportAsPDF({ ...result, code, created_at: new Date().toISOString() })} className="flex-1 text-xs">
+                      <Button variant="outline" size="sm" onClick={() => exportAsPDF({ ...result, code: combinedCode, created_at: new Date().toISOString() })} className="flex-1 text-xs">
                         <Download className="w-3 h-3" /> Export PDF
                       </Button>
                       <Button
@@ -855,7 +1042,7 @@ const Analysis = () => {
                             const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/suggest`, {
                               method: "POST",
                               headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
-                              body: JSON.stringify({ code, analysis: result }),
+                              body: JSON.stringify({ code: combinedCode, analysis: result }),
                             });
                             if (!resp.ok) { const err = await resp.json().catch(() => ({ error: "Failed" })); toast.error(err.error || "Failed"); return; }
                             const data = await resp.json();
