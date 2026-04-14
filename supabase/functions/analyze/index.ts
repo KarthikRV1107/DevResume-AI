@@ -271,6 +271,14 @@ function enterpriseSecurityScan(code: string, language: string): SecurityFinding
     { regex: /xox[bpors]-[a-zA-Z0-9-]+/, title: "Slack token exposed", severity: "critical" as const },
     { regex: /-----BEGIN\s+(?:RSA|EC|DSA)?\s*PRIVATE\s+KEY-----/, title: "Private key in source code", severity: "critical" as const },
     { regex: /(?:mongodb|postgres|mysql):\/\/[^\s'"]+:[^\s'"]+@/, title: "Database connection string with credentials", severity: "critical" as const },
+    { regex: /AIza[0-9A-Za-z_-]{35}/, title: "Google API key exposed", severity: "critical" as const },
+    { regex: /ya29\.[0-9A-Za-z_-]+/, title: "Google OAuth token exposed", severity: "critical" as const },
+    { regex: /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/, title: "JWT token hardcoded in source", severity: "high" as const },
+    { regex: /SG\.[a-zA-Z0-9_-]{22}\.[a-zA-Z0-9_-]{43}/, title: "SendGrid API key exposed", severity: "critical" as const },
+    { regex: /sq0[a-z]{3}-[a-zA-Z0-9_-]{22,}/, title: "Square API key exposed", severity: "critical" as const },
+    { regex: /sk_live_[a-zA-Z0-9]{24,}/, title: "Stripe live secret key exposed", severity: "critical" as const },
+    { regex: /rk_live_[a-zA-Z0-9]{24,}/, title: "Stripe restricted key exposed", severity: "critical" as const },
+    { regex: /AAAA[A-Za-z0-9_-]{7}:[A-Za-z0-9_-]{140}/, title: "Firebase Cloud Messaging key exposed", severity: "critical" as const },
   ];
   for (const sp of secretPatterns) {
     for (let i = 0; i < lines.length; i++) {
