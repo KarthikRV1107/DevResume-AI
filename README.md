@@ -114,8 +114,8 @@ Architecture diagram available at:
 ### 1️⃣ Clone Repository
 
 ```bash
-git clone https://github.com/your-username/BWT_teamName.git
-cd BWT_teamName
+git clone https://github.com/your-username/resume-code-boost.git
+cd resume-code-boost
 2️⃣ Backend Setup
 pip install -r requirements.txt
 uvicorn main:app --reload
@@ -215,15 +215,3 @@ MIT License
 ⭐ Tagline
 
 Ship faster. Resume smarter.
-
-
----
-
-If you want, I can also give you:
-
-- 🔥 A more advanced “enterprise-grade” README (for clients)
-- 📊 A README with badges (build, version, license)
-- 🎯 A minimal hackathon version
-- 🧠 A technical deep-dive version for GitHub impress factor
-
-Tell me which one you need.
