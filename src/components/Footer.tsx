@@ -8,7 +8,7 @@ const Footer = () => (
           <Terminal className="w-4 h-4 text-primary" />
           <span className="font-mono"><span className="text-foreground">DevResume</span> AI</span>
           <span className="text-border">|</span>
-          <span>Built by BWT_Techies</span>
+          <span>Built by Karthik R V</span>
         </div>
         <div className="flex items-center gap-6 text-sm text-muted-foreground">
           <a href="#features" className="hover:text-primary transition-colors">Features</a>
@@ -18,7 +18,7 @@ const Footer = () => (
         </div>
       </div>
       <div className="mt-6 text-center text-xs text-muted-foreground/60 font-mono">
-        © 2026 BWT_Techies. Context Recovery Engine v1.0
+        © 2026 Karthik R V. Context Recovery Engine v1.0
       </div>
     </div>
   </footer>
