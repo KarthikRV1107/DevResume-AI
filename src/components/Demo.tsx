@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Play, Loader2, Zap, AlertTriangle, Brain, ChevronRight, MessageSquare, Send, X, Upload, FileCode, Trash2, Download, FileText, Sparkles, Copy, Check, Bot, User, RotateCcw, Maximize2, Minimize2 } from "lucide-react";
+import { Play, Loader2, Zap, AlertTriangle, Brain, ChevronRight, MessageSquare, Send, X, Upload, FileCode, Trash2, Download, FileText, Sparkles, Copy, Check, Bot, User, RotateCcw, Maximize2, Minimize2, Coins } from "lucide-react";
 import { exportAsMarkdown, exportAsPDF } from "@/lib/exportAnalysis";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -75,6 +75,36 @@ const Demo = () => {
   const [chatLoading, setChatLoading] = useState(false);
   const [chatExpanded, setChatExpanded] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Credits state
+  const [credits, setCredits] = useState<{ total: number; used: number } | null>(null);
+  const [creditsLoading, setCreditsLoading] = useState(true);
+  const remainingCredits = credits ? credits.total - credits.used : 0;
+
+  useEffect(() => {
+    if (!user) { setCreditsLoading(false); return; }
+    const fetchCredits = async () => {
+      setCreditsLoading(true);
+      const { data, error } = await supabase
+        .from("user_credits")
+        .select("total_credits, used_credits")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (error) { console.error("Credits fetch error:", error); setCreditsLoading(false); return; }
+      if (!data) {
+        const { data: newRow, error: insertErr } = await supabase
+          .from("user_credits")
+          .insert({ user_id: user.id, total_credits: 5, used_credits: 0 })
+          .select("total_credits, used_credits")
+          .single();
+        if (!insertErr && newRow) setCredits({ total: newRow.total_credits, used: newRow.used_credits });
+      } else {
+        setCredits({ total: data.total_credits, used: data.used_credits });
+      }
+      setCreditsLoading(false);
+    };
+    fetchCredits();
+  }, [user]);
 
   // Auto-scroll chat
   useEffect(() => {
@@ -167,6 +197,7 @@ const Demo = () => {
 
   const handleAnalyze = async () => {
     if (!code.trim()) return;
+    if (user && remainingCredits <= 0) { toast.error("No demo credits remaining."); return; }
     setLoading(true);
     setResult(null);
     setStreamText("");
@@ -222,8 +253,17 @@ const Demo = () => {
 
         if (finalResult) {
           setResult(finalResult);
-          // Save to history for logged-in users
           if (user) {
+            // Deduct credit
+            const newUsed = (credits?.used ?? 0) + 1;
+            const newRemaining = (credits?.total ?? 5) - newUsed;
+            await supabase
+              .from("user_credits")
+              .update({ used_credits: newUsed, updated_at: new Date().toISOString() })
+              .eq("user_id", user.id);
+            setCredits(prev => prev ? { ...prev, used: newUsed } : prev);
+            toast.info(`${newRemaining} demo credit${newRemaining !== 1 ? "s" : ""} remaining`);
+
             supabase.from("analyses").insert({
               user_id: user.id,
               code: code.slice(0, 10000),
@@ -430,9 +470,9 @@ const Demo = () => {
               />
             </div>
             <div className="flex gap-3">
-              <Button variant="hero" onClick={handleAnalyze} disabled={loading || !code.trim()} className="flex-1">
+              <Button variant="hero" onClick={handleAnalyze} disabled={loading || !code.trim() || (!!user && remainingCredits <= 0)} className="flex-1">
                 {loading ? <Loader2 className="animate-spin" /> : <Play />}
-                {loading ? "Analyzing..." : "Analyze"}
+                {loading ? "Analyzing..." : (user && remainingCredits <= 0) ? "No Credits Left" : "Analyze"}
               </Button>
               <Button
                 variant="hero-outline"
@@ -443,6 +483,36 @@ const Demo = () => {
                 Chat
               </Button>
             </div>
+
+            {/* Credits Display */}
+            {user && (
+              <div className="flex items-center justify-between rounded-lg border border-border bg-card/60 backdrop-blur-sm px-4 py-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <Coins className="w-4 h-4 text-primary" />
+                  <span className="font-mono text-foreground">Demo Credits</span>
+                </div>
+                {creditsLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                ) : credits ? (
+                  <div className="flex items-center gap-3">
+                    <div className="flex gap-1">
+                      {Array.from({ length: credits.total }).map((_, i) => (
+                        <div
+                          key={i}
+                          className={`w-3 h-3 rounded-full transition-colors ${
+                            i < remainingCredits ? "bg-primary shadow-[0_0_6px_hsl(var(--primary)/0.5)]" : "bg-muted"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <span className={`font-mono text-sm font-bold ${remainingCredits <= 1 ? "text-red-400" : "text-primary"}`}>
+                      {remainingCredits}/{credits.total}
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+            )}
+
           </motion.div>
 
           {/* Output */}
