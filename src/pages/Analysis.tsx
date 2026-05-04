@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Play, Loader2, Zap, AlertTriangle, Brain, ChevronRight, MessageSquare, Send, X, Upload, FileCode, Trash2, Download, FileText, Sparkles, Copy, Check, Bot, User, RotateCcw, Maximize2, Minimize2, Shield, ShieldAlert, ShieldCheck, ShieldX, Package, Scale, FolderOpen, ChevronDown, ChevronUp, Folder, File, Eye, Coins } from "lucide-react";
+import { Play, Loader2, Zap, AlertTriangle, Brain, ChevronRight, MessageSquare, Send, X, Upload, FileCode, Trash2, Download, FileText, Sparkles, Copy, Check, Bot, User, RotateCcw, Maximize2, Minimize2, Shield, ShieldAlert, ShieldCheck, ShieldX, Package, Scale, FolderOpen, ChevronDown, ChevronUp, Folder, File, Eye } from "lucide-react";
 import { exportAsMarkdown, exportAsPDF } from "@/lib/exportAnalysis";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -272,39 +272,6 @@ const Analysis = () => {
 
   const [activeResultTab, setActiveResultTab] = useState<"overview" | "security" | "dependencies" | "compliance">("overview");
 
-  // Credits state
-  const [credits, setCredits] = useState<{ total: number; used: number } | null>(null);
-  const [creditsLoading, setCreditsLoading] = useState(true);
-
-  const remainingCredits = credits ? credits.total - credits.used : 0;
-
-  // Fetch or initialize credits
-  useEffect(() => {
-    if (!user) { setCreditsLoading(false); return; }
-    const fetchCredits = async () => {
-      setCreditsLoading(true);
-      const { data, error } = await supabase
-        .from("user_credits")
-        .select("total_credits, used_credits")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (error) { console.error("Credits fetch error:", error); setCreditsLoading(false); return; }
-      if (!data) {
-        // Create credits row for existing users
-        const { data: newRow, error: insertErr } = await supabase
-          .from("user_credits")
-          .insert({ user_id: user.id, total_credits: 5, used_credits: 0 })
-          .select("total_credits, used_credits")
-          .single();
-        if (!insertErr && newRow) setCredits({ total: newRow.total_credits, used: newRow.used_credits });
-      } else {
-        setCredits({ total: data.total_credits, used: data.used_credits });
-      }
-      setCreditsLoading(false);
-    };
-    fetchCredits();
-  }, [user]);
-
   const fileTree = useMemo(() => buildFileTree(uploadedFiles), [uploadedFiles]);
 
   const editorContent = useMemo(() => {
@@ -478,7 +445,6 @@ const Analysis = () => {
     const analyzeCode = combinedCode.trim() || code.trim();
     if (!analyzeCode) return;
     if (!user) { toast.error("Please sign in to analyze code."); return; }
-    if (remainingCredits <= 0) { toast.error("No credits remaining. You've used all your demo credits."); return; }
     setLoading(true);
     setResult(null);
     setStreamText("");
@@ -530,14 +496,6 @@ const Analysis = () => {
         }
         if (finalResult) {
           setResult(finalResult);
-            // Deduct credit
-            const newUsed = (credits?.used ?? 0) + 1;
-            await supabase
-              .from("user_credits")
-              .update({ used_credits: newUsed, updated_at: new Date().toISOString() })
-              .eq("user_id", user.id);
-            setCredits(prev => prev ? { ...prev, used: newUsed } : prev);
-
             supabase.from("analyses").insert({
               user_id: user.id,
               code: analyzeCode.slice(0, 50000),
@@ -795,44 +753,14 @@ const Analysis = () => {
               </div>
 
               <div className="flex gap-3">
-                <Button variant="hero" onClick={handleAnalyze} disabled={loading || (!code.trim() && !combinedCode.trim()) || remainingCredits <= 0} className="flex-1">
+                <Button variant="hero" onClick={handleAnalyze} disabled={loading || (!code.trim() && !combinedCode.trim())} className="flex-1">
                   {loading ? <Loader2 className="animate-spin" /> : <Play />}
-                  {loading ? "Analyzing..." : remainingCredits <= 0 ? "No Credits Left" : "Analyze Project"}
+                  {loading ? "Analyzing..." : "Analyze Project"}
                 </Button>
                 <Button variant="hero-outline" onClick={() => setChatOpen(!chatOpen)} className="gap-2">
                   <MessageSquare className="w-4 h-4" /> Chat
                 </Button>
               </div>
-
-              {/* Credits Display */}
-              <div className="flex items-center justify-between rounded-lg border border-border bg-card/60 backdrop-blur-sm px-4 py-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <Coins className="w-4 h-4 text-primary" />
-                  <span className="font-mono text-foreground">Demo Credits</span>
-                </div>
-                {creditsLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                ) : credits ? (
-                  <div className="flex items-center gap-3">
-                    <div className="flex gap-1">
-                      {Array.from({ length: credits.total }).map((_, i) => (
-                        <div
-                          key={i}
-                          className={`w-3 h-3 rounded-full transition-colors ${
-                            i < remainingCredits ? "bg-primary shadow-[0_0_6px_hsl(var(--primary)/0.5)]" : "bg-muted"
-                          }`}
-                        />
-                      ))}
-                    </div>
-                    <span className={`font-mono text-sm font-bold ${remainingCredits <= 1 ? "text-red-400" : "text-primary"}`}>
-                      {remainingCredits}/{credits.total}
-                    </span>
-                  </div>
-                ) : (
-                  <span className="text-sm text-muted-foreground">Sign in to view</span>
-                )}
-              </div>
-
             </motion.div>
 
             {/* Output */}
