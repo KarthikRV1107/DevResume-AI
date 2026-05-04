@@ -2,8 +2,6 @@ import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import Features from "@/components/Features";
 import Demo from "@/components/Demo";
-import Team from "@/components/Team";
-import Pitch from "@/components/Pitch";
 import Footer from "@/components/Footer";
 import Background3D from "@/components/Background3D";
 
@@ -14,8 +12,6 @@ const Index = () => (
     <Hero />
     <Features />
     <Demo />
-    <Team />
-    <Pitch />
     <Footer />
   </div>
 );
