@@ -82,7 +82,14 @@ const Demo = () => {
   const remainingCredits = credits ? credits.total - credits.used : 0;
 
   useEffect(() => {
-    if (!user) { setCreditsLoading(false); return; }
+    if (!user) {
+      // Use localStorage for anonymous demo credits
+      const stored = localStorage.getItem("demo_credits_used");
+      const used = stored ? parseInt(stored, 10) : 0;
+      setCredits({ total: 5, used: isNaN(used) ? 0 : used });
+      setCreditsLoading(false);
+      return;
+    }
     const fetchCredits = async () => {
       setCreditsLoading(true);
       const { data, error } = await supabase
@@ -197,7 +204,7 @@ const Demo = () => {
 
   const handleAnalyze = async () => {
     if (!code.trim()) return;
-    if (user && remainingCredits <= 0) { toast.error("No demo credits remaining."); return; }
+    if (remainingCredits <= 0) { toast.error("No demo credits remaining."); return; }
     setLoading(true);
     setResult(null);
     setStreamText("");
@@ -281,6 +288,13 @@ const Demo = () => {
             }).then(({ error }) => {
               if (!error) toast.success("Analysis saved to history!");
             });
+          } else {
+            // Deduct credit from localStorage for anonymous users
+            const newUsed = (credits?.used ?? 0) + 1;
+            const newRemaining = (credits?.total ?? 5) - newUsed;
+            localStorage.setItem("demo_credits_used", String(newUsed));
+            setCredits(prev => prev ? { ...prev, used: newUsed } : prev);
+            toast.info(`${newRemaining} demo credit${newRemaining !== 1 ? "s" : ""} remaining`);
           }
         }
       } else {
@@ -470,9 +484,9 @@ const Demo = () => {
               />
             </div>
             <div className="flex gap-3">
-              <Button variant="hero" onClick={handleAnalyze} disabled={loading || !code.trim() || (!!user && remainingCredits <= 0)} className="flex-1">
+              <Button variant="hero" onClick={handleAnalyze} disabled={loading || !code.trim() || remainingCredits <= 0} className="flex-1">
                 {loading ? <Loader2 className="animate-spin" /> : <Play />}
-                {loading ? "Analyzing..." : (user && remainingCredits <= 0) ? "No Credits Left" : "Analyze"}
+                {loading ? "Analyzing..." : remainingCredits <= 0 ? "No Credits Left" : "Analyze"}
               </Button>
               <Button
                 variant="hero-outline"
@@ -485,7 +499,6 @@ const Demo = () => {
             </div>
 
             {/* Credits Display */}
-            {user && (
               <div className="flex items-center justify-between rounded-lg border border-border bg-card/60 backdrop-blur-sm px-4 py-3">
                 <div className="flex items-center gap-2 text-sm">
                   <Coins className="w-4 h-4 text-primary" />
@@ -511,7 +524,6 @@ const Demo = () => {
                   </div>
                 ) : null}
               </div>
-            )}
 
           </motion.div>
 
