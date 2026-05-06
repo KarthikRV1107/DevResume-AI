@@ -41,6 +41,17 @@ interface ComplianceCheck {
   remediation?: string;
 }
 
+interface VirusTotalResult {
+  url: string;
+  malicious: number;
+  suspicious: number;
+  harmless: number;
+  undetected: number;
+  status: "clean" | "suspicious" | "malicious" | "error";
+  permalink?: string;
+  error?: string;
+}
+
 interface AnalysisResult {
   goal: string;
   language: string;
@@ -68,6 +79,7 @@ interface AnalysisResult {
   dependency_audit?: DependencyFinding[];
   compliance_checks?: ComplianceCheck[];
   security_summary?: { critical: number; high: number; medium: number; low: number; total: number };
+  virustotal_results?: VirusTotalResult[];
 }
 
 type ChatMsg = { role: "user" | "assistant"; content: string };
@@ -951,6 +963,41 @@ const Analysis = () => {
                           <div className="text-center py-8">
                             <ShieldCheck className="w-10 h-10 text-green-400 mx-auto mb-2" />
                             <p className="text-sm text-muted-foreground">No security vulnerabilities detected!</p>
+                          </div>
+                        )}
+
+                        {/* VirusTotal URL Scan Results */}
+                        {result.virustotal_results && result.virustotal_results.length > 0 && (
+                          <div className="space-y-2 mt-4">
+                            <h4 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                              <Shield className="w-3.5 h-3.5 text-primary" />
+                              VirusTotal URL Scan ({result.virustotal_results.length} URL{result.virustotal_results.length > 1 ? "s" : ""})
+                            </h4>
+                            {result.virustotal_results.map((vt, i) => (
+                              <motion.div key={i} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} className="rounded-lg border border-border bg-background/50 p-3 space-y-1.5">
+                                <div className="flex items-start gap-2">
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded uppercase font-bold border ${
+                                    vt.status === "malicious" ? "text-red-400 bg-red-500/10 border-red-500/20" :
+                                    vt.status === "suspicious" ? "text-yellow-400 bg-yellow-500/10 border-yellow-500/20" :
+                                    vt.status === "error" ? "text-muted-foreground bg-secondary border-border" :
+                                    "text-green-400 bg-green-500/10 border-green-500/20"
+                                  }`}>{vt.status}</span>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-mono text-foreground truncate">{vt.url}</p>
+                                    {vt.error ? (
+                                      <p className="text-[11px] text-muted-foreground">{vt.error}</p>
+                                    ) : (
+                                      <div className="flex items-center gap-3 mt-1">
+                                        <span className="text-[10px] text-red-400">🔴 {vt.malicious} malicious</span>
+                                        <span className="text-[10px] text-yellow-400">⚠️ {vt.suspicious} suspicious</span>
+                                        <span className="text-[10px] text-green-400">✅ {vt.harmless} clean</span>
+                                        <span className="text-[10px] text-muted-foreground">❓ {vt.undetected}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </motion.div>
+                            ))}
                           </div>
                         )}
                       </div>
