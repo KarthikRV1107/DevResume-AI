@@ -450,6 +450,93 @@ function sseMessage(data: any): string {
   return `data: ${JSON.stringify(data)}\n\n`;
 }
 
+// ─── VirusTotal URL Scanner ──────────────────────────────────────────
+interface VirusTotalResult {
+  url: string;
+  malicious: number;
+  suspicious: number;
+  harmless: number;
+  undetected: number;
+  status: "clean" | "suspicious" | "malicious" | "error";
+  permalink?: string;
+  error?: string;
+}
+
+function extractUrls(code: string): string[] {
+  const urlRegex = /https?:\/\/[^\s'"`,;\])}><]+/gi;
+  const matches = code.match(urlRegex) || [];
+  // Deduplicate and filter out common non-interesting URLs
+  const filtered = [...new Set(matches)].filter(u => {
+    const lower = u.toLowerCase();
+    return !lower.includes("localhost") &&
+           !lower.includes("127.0.0.1") &&
+           !lower.includes("example.com") &&
+           !lower.includes("schemas.") &&
+           !lower.includes("www.w3.org") &&
+           !lower.includes("deno.land") &&
+           !lower.includes("cdn.jsdelivr.net") &&
+           !lower.includes("unpkg.com") &&
+           !lower.includes("googleapis.com/auth") &&
+           !lower.includes("json-schema.org");
+  });
+  return filtered.slice(0, 10); // Scan max 10 URLs
+}
+
+async function scanUrlsWithVirusTotal(urls: string[], apiKey: string): Promise<VirusTotalResult[]> {
+  const results: VirusTotalResult[] = [];
+
+  for (const url of urls) {
+    try {
+      // URL ID for VT is base64url of the URL
+      const urlId = btoa(url).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+      const response = await fetch(`https://www.virustotal.com/api/v3/urls/${urlId}`, {
+        headers: { "x-apikey": apiKey },
+      });
+
+      if (response.status === 404) {
+        // URL not in VT database — submit it
+        const submitResp = await fetch("https://www.virustotal.com/api/v3/urls", {
+          method: "POST",
+          headers: { "x-apikey": apiKey, "Content-Type": "application/x-www-form-urlencoded" },
+          body: `url=${encodeURIComponent(url)}`,
+        });
+        if (submitResp.ok) {
+          results.push({ url, malicious: 0, suspicious: 0, harmless: 0, undetected: 0, status: "clean", error: "Submitted for scanning — results pending" });
+        } else {
+          await submitResp.text();
+          results.push({ url, malicious: 0, suspicious: 0, harmless: 0, undetected: 0, status: "error", error: "Failed to submit URL" });
+        }
+        continue;
+      }
+
+      if (!response.ok) {
+        const errText = await response.text();
+        results.push({ url, malicious: 0, suspicious: 0, harmless: 0, undetected: 0, status: "error", error: `VT API error: ${response.status}` });
+        continue;
+      }
+
+      const data = await response.json();
+      const stats = data?.data?.attributes?.last_analysis_stats || {};
+      const malicious = stats.malicious || 0;
+      const suspicious = stats.suspicious || 0;
+      const harmless = stats.harmless || 0;
+      const undetected = stats.undetected || 0;
+      const permalink = data?.data?.links?.self || undefined;
+
+      let status: VirusTotalResult["status"] = "clean";
+      if (malicious > 0) status = "malicious";
+      else if (suspicious > 0) status = "suspicious";
+
+      results.push({ url, malicious, suspicious, harmless, undetected, status, permalink });
+    } catch (e) {
+      results.push({ url, malicious: 0, suspicious: 0, harmless: 0, undetected: 0, status: "error", error: e instanceof Error ? e.message : "Unknown error" });
+    }
+  }
+
+  return results;
+}
+
 // ─── Main Handler ─────────────────────────────────────────────────────
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -475,6 +562,18 @@ serve(async (req) => {
     const momentum = calculateMomentum(code, issues);
     const metrics = computeMetrics(code, detectedLang);
     const level = explanation_level || "Intermediate";
+
+    // VirusTotal URL scanning
+    const VT_API_KEY = Deno.env.get("VIRUSTOTAL_API_KEY");
+    const extractedUrls = extractUrls(code);
+    let virusTotalResults: VirusTotalResult[] = [];
+    if (VT_API_KEY && extractedUrls.length > 0) {
+      try {
+        virusTotalResults = await scanUrlsWithVirusTotal(extractedUrls, VT_API_KEY);
+      } catch (e) {
+        console.error("VirusTotal scan error:", e);
+      }
+    }
 
     const classMatch = code.match(/class\s+(\w+)/);
     const funcMatches = code.match(/\b(?:def|function|func|fn|fun)\s+(\w+)/g) || [];
@@ -532,6 +631,7 @@ serve(async (req) => {
       dependency_audit: dependencyFindings,
       compliance_checks: complianceResults,
       security_summary: securitySummary,
+      virustotal_results: virusTotalResults,
     });
 
     const systemPrompt = `You are DevResume AI, an elite-level code analysis engine used by senior engineers. Perform deep, precise analysis including security assessment.
@@ -601,6 +701,11 @@ ${code.slice(0, 60000)}
             controller.enqueue(encoder.encode(sseMessage({ type: "progress", message: `🔒 Security scan: ${securityFindings.length} finding(s) (${securitySummary.critical} critical, ${securitySummary.high} high)` })));
             controller.enqueue(encoder.encode(sseMessage({ type: "progress", message: `📦 Dependency audit: ${dependencyFindings.length} issue(s) found` })));
             controller.enqueue(encoder.encode(sseMessage({ type: "progress", message: `📋 Compliance: ${complianceResults.filter(c => c.status === "fail").length} failures, ${complianceResults.filter(c => c.status === "pass").length} passing` })));
+            if (virusTotalResults.length > 0) {
+              const vtMalicious = virusTotalResults.filter(r => r.status === "malicious").length;
+              const vtSuspicious = virusTotalResults.filter(r => r.status === "suspicious").length;
+              controller.enqueue(encoder.encode(sseMessage({ type: "progress", message: `🛡️ VirusTotal: ${virusTotalResults.length} URL(s) scanned — ${vtMalicious} malicious, ${vtSuspicious} suspicious` })));
+            }
 
             if (!LOVABLE_API_KEY) {
               controller.enqueue(encoder.encode(sseMessage({ type: "progress", message: "Running deep static + security analysis..." })));
@@ -659,6 +764,7 @@ ${code.slice(0, 60000)}
                       dependency_audit: dependencyFindings,
                       compliance_checks: complianceResults,
                       security_summary: securitySummary,
+                      virustotal_results: virusTotalResults,
                     },
                   })));
                 } else {
@@ -733,6 +839,7 @@ ${code.slice(0, 60000)}
       dependency_audit: dependencyFindings,
       compliance_checks: complianceResults,
       security_summary: securitySummary,
+      virustotal_results: virusTotalResults,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     console.error("analyze error:", e);
