@@ -1,0 +1,14 @@
+# DevResume
+
+> AI-powered code context recovery engine. Analyzes codebases to recover lost context, score quality, and generate actionable improvement suggestions for developers.
+
+DevResume helps developers resume work on unfamiliar code quickly. Upload a project or paste code to get static analysis, AI-generated suggestions, and an interactive chat interface to explore the codebase.
+
+## Pages
+
+- [Home](/): Overview of DevResume, features, demo, and team.
+- [Analysis](/analysis): Upload code or a project folder to run static analysis and get AI suggestions.
+
+## Optional
+
+- [Sign in](/auth): Account access for saving analysis history.
