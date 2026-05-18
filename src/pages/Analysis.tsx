@@ -720,7 +720,7 @@ const Analysis = () => {
                     <div className="w-48 md:w-56 border-r border-border bg-card/30 flex flex-col shrink-0">
                       <div className="flex items-center justify-between px-2 py-1.5 border-b border-border/50">
                         <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Explorer</span>
-                        <button onClick={expandAllFolders} className="text-[10px] text-muted-foreground hover:text-primary transition-colors" title="Expand all">
+                        <button onClick={expandAllFolders} className="text-[10px] text-muted-foreground hover:text-primary transition-colors" title="Expand all" aria-label="Expand all folders">
                           <FolderOpen className="w-3 h-3" />
                         </button>
                       </div>

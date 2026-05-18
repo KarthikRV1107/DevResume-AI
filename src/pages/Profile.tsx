@@ -162,6 +162,7 @@ const Profile = () => {
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
               className="absolute inset-0 flex items-center justify-center bg-background/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+              aria-label="Upload avatar"
             >
               {uploading ? (
                 <Loader2 className="animate-spin w-6 h-6 text-primary" />

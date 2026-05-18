@@ -144,6 +144,7 @@ const History = () => {
                     </div>
                     <button
                       onClick={(e) => { e.stopPropagation(); deleteAnalysis(a.id); }}
+                      aria-label="Delete analysis"
                       className="text-muted-foreground hover:text-destructive transition-colors p-1"
                     >
                       <Trash2 className="w-4 h-4" />
