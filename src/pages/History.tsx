@@ -9,6 +9,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { toast } from "sonner";
 import Background3D from "@/components/Background3D";
 import Navbar from "@/components/Navbar";
+import Seo from "@/components/Seo";
 
 interface Analysis {
   id: string;
@@ -73,6 +74,11 @@ const History = () => {
 
   return (
     <div className="min-h-screen relative">
+      <Seo
+        title="Analysis History — DevResume"
+        description="Review your saved DevResume analyses, revisit AI suggestions, and export reports."
+        path="/history"
+      />
       <Background3D />
       <Navbar />
       <div className="container mx-auto px-4 pt-24 pb-16 relative z-10">

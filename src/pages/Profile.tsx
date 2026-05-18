@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { useNavigate, Link } from "react-router-dom";
 import Background3D from "@/components/Background3D";
+import Seo from "@/components/Seo";
 
 const Profile = () => {
   const { user, loading: authLoading } = useAuth();
@@ -122,6 +123,11 @@ const Profile = () => {
 
   return (
     <div className="min-h-screen relative flex items-center justify-center">
+      <Seo
+        title="Your Profile — DevResume"
+        description="Update your DevResume profile, display name, and avatar."
+        path="/profile"
+      />
       <Background3D />
       <motion.div
         initial={{ opacity: 0, y: 20, scale: 0.95 }}

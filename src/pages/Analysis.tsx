@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import Navbar from "@/components/Navbar";
 import Background3D from "@/components/Background3D";
+import Seo from "@/components/Seo";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -613,6 +614,11 @@ const Analysis = () => {
 
   return (
     <div className="min-h-screen scanline relative">
+      <Seo
+        title="Code Analysis — DevResume"
+        description="Upload code or a project folder and get instant static analysis, security findings, and AI-powered suggestions from DevResume."
+        path="/analysis"
+      />
       <Background3D />
       <Navbar />
       <main className="pt-24 pb-16">
