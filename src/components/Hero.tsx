@@ -20,8 +20,8 @@ const Hero = () => {
           </div>
 
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight">
-            DevResume AI — Recover lost developer context from your code.{" "}
-            <span className="text-gradient">You didn't lose your skill, you lost your context.</span>
+            You didn't lose your skill.{" "}
+            <span className="text-gradient">You lost your context.</span>
           </h1>
 
           <p className="text-muted-foreground text-lg max-w-lg">

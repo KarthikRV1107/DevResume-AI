@@ -450,7 +450,7 @@ const Demo = () => {
                   >
                     <FileCode className="w-3 h-3" />
                     {f.name}
-                    <button onClick={(e) => { e.stopPropagation(); removeFile(i); }} className="hover:text-destructive transition-colors" aria-label={`Remove file ${f.name}`}>
+                    <button onClick={(e) => { e.stopPropagation(); removeFile(i); }} className="hover:text-destructive transition-colors">
                       <X className="w-3 h-3" />
                     </button>
                   </span>
@@ -828,7 +828,7 @@ const Demo = () => {
                 >
                   {chatExpanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
                 </button>
-                <button onClick={() => setChatOpen(false)} className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-secondary" aria-label="Close chat">
+                <button onClick={() => setChatOpen(false)} className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-secondary">
                   <X className="w-4 h-4" />
                 </button>
               </div>
@@ -926,7 +926,6 @@ const Demo = () => {
                 onClick={sendChat}
                 disabled={chatLoading || !chatInput.trim()}
                 className="shrink-0 h-10 w-10 rounded-lg bg-primary hover:bg-primary/90"
-                aria-label="Send message"
               >
                 <Send className="w-4 h-4" />
               </Button>

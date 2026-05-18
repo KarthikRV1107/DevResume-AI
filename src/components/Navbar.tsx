@@ -104,7 +104,7 @@ const Navbar = () => {
 
         <div className="md:hidden flex items-center gap-2">
           <ThemeToggle />
-          <button className="text-foreground" onClick={() => setOpen(!open)} aria-label="Toggle menu" aria-expanded={open}>
+          <button className="text-foreground" onClick={() => setOpen(!open)}>
             {open ? <X /> : <Menu />}
           </button>
         </div>
