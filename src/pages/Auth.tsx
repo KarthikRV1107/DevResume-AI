@@ -8,7 +8,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate, Link } from "react-router-dom";
 import Background3D from "@/components/Background3D";
-import Seo from "@/components/Seo";
 
 type Mode = "login" | "signup" | "forgot";
 
@@ -57,11 +56,6 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen relative flex items-center justify-center">
-      <Seo
-        title="Sign in to DevResume — Developer Context Recovery"
-        description="Sign in or create a DevResume account to analyze codebases, save analysis history, and get AI suggestions."
-        path="/auth"
-      />
       <Background3D />
       <motion.div
         initial={{ opacity: 0, y: 20, scale: 0.95 }}

@@ -9,7 +9,6 @@ import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import Navbar from "@/components/Navbar";
 import Background3D from "@/components/Background3D";
-import Seo from "@/components/Seo";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -614,11 +613,6 @@ const Analysis = () => {
 
   return (
     <div className="min-h-screen scanline relative">
-      <Seo
-        title="Code Analysis — DevResume"
-        description="Upload code or a project folder and get instant static analysis, security findings, and AI-powered suggestions from DevResume."
-        path="/analysis"
-      />
       <Background3D />
       <Navbar />
       <main className="pt-24 pb-16">
@@ -726,7 +720,7 @@ const Analysis = () => {
                     <div className="w-48 md:w-56 border-r border-border bg-card/30 flex flex-col shrink-0">
                       <div className="flex items-center justify-between px-2 py-1.5 border-b border-border/50">
                         <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Explorer</span>
-                        <button onClick={expandAllFolders} className="text-[10px] text-muted-foreground hover:text-primary transition-colors" title="Expand all" aria-label="Expand all folders">
+                        <button onClick={expandAllFolders} className="text-[10px] text-muted-foreground hover:text-primary transition-colors" title="Expand all">
                           <FolderOpen className="w-3 h-3" />
                         </button>
                       </div>

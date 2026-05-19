@@ -10,7 +10,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import Background3D from "@/components/Background3D";
 import Navbar from "@/components/Navbar";
-import Seo from "@/components/Seo";
 import { toast } from "sonner";
 
 interface AnalysisRow {
@@ -156,11 +155,6 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen relative">
-      <Seo
-        title="Analytics Dashboard — DevResume"
-        description="Visualize trends across your DevResume analyses with charts for completion, effort, and confidence."
-        path="/dashboard"
-      />
       <Background3D />
       <Navbar />
       <div className="container mx-auto px-4 pt-24 pb-16 relative z-10">
