@@ -145,7 +145,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      deduct_user_credit: {
+        Args: never
+        Returns: {
+          total_credits: number
+          used_credits: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
