@@ -261,15 +261,16 @@ const Demo = () => {
         if (finalResult) {
           setResult(finalResult);
           if (user) {
-            // Deduct credit
-            const newUsed = (credits?.used ?? 0) + 1;
-            const newRemaining = (credits?.total ?? 5) - newUsed;
-            await supabase
-              .from("user_credits")
-              .update({ used_credits: newUsed, updated_at: new Date().toISOString() })
-              .eq("user_id", user.id);
-            setCredits(prev => prev ? { ...prev, used: newUsed } : prev);
-            toast.info(`${newRemaining} demo credit${newRemaining !== 1 ? "s" : ""} remaining`);
+            // Deduct credit server-side (prevents tampering)
+            const { data: creditData, error: creditErr } = await (supabase as any).rpc("deduct_user_credit");
+            if (creditErr) {
+              console.error("Credit deduction failed:", creditErr);
+            } else if (creditData && creditData[0]) {
+              const row = creditData[0];
+              const newRemaining = row.total_credits - row.used_credits;
+              setCredits({ total: row.total_credits, used: row.used_credits });
+              toast.info(`${newRemaining} demo credit${newRemaining !== 1 ? "s" : ""} remaining`);
+            }
 
             supabase.from("analyses").insert({
               user_id: user.id,
