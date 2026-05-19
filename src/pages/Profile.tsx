@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { useNavigate, Link } from "react-router-dom";
 import Background3D from "@/components/Background3D";
+import Seo from "@/components/Seo";
 
 const Profile = () => {
   const { user, loading: authLoading } = useAuth();
@@ -122,6 +123,11 @@ const Profile = () => {
 
   return (
     <div className="min-h-screen relative flex items-center justify-center">
+      <Seo
+        title="Your Profile — DevResume"
+        description="Update your DevResume profile, display name, and avatar."
+        path="/profile"
+      />
       <Background3D />
       <motion.div
         initial={{ opacity: 0, y: 20, scale: 0.95 }}
@@ -162,6 +168,7 @@ const Profile = () => {
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
               className="absolute inset-0 flex items-center justify-center bg-background/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+              aria-label="Upload avatar"
             >
               {uploading ? (
                 <Loader2 className="animate-spin w-6 h-6 text-primary" />
