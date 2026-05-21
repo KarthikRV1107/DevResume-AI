@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Terminal, ArrowLeft, Camera, Loader2, User } from "lucide-react";
+import { Terminal, ArrowLeft, Camera, Loader2, User, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +22,7 @@ const Profile = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -106,6 +107,20 @@ const Profile = () => {
       toast.success("Profile updated!");
     }
     setSaving(false);
+  };
+
+  const handlePasswordReset = async () => {
+    if (!user?.email) return;
+    setResetting(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) {
+      toast.error("Failed to send reset email: " + error.message);
+    } else {
+      toast.success("Password reset link sent to your email!");
+    }
+    setResetting(false);
   };
 
   if (authLoading || loading) {
@@ -226,6 +241,27 @@ const Profile = () => {
             Save Changes
           </Button>
         </form>
+
+        <div className="mt-6 pt-6 border-t border-border">
+          <Label className="text-foreground">Password</Label>
+          <p className="text-xs text-muted-foreground mt-1 mb-3">
+            We'll email you a secure link to set a new password.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={handlePasswordReset}
+            disabled={resetting}
+          >
+            {resetting ? (
+              <Loader2 className="animate-spin mr-2 w-4 h-4" />
+            ) : (
+              <KeyRound className="mr-2 w-4 h-4" />
+            )}
+            Send Password Reset Email
+          </Button>
+        </div>
       </motion.div>
     </div>
   );
