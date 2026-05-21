@@ -8,13 +8,13 @@ extra_search_path = ["public", "extensions"]
 max_rows = 1000
 
 [functions.analyze]
-verify_jwt = false
+verify_jwt = true
 
 [functions.health]
 verify_jwt = false
 
 [functions.chat]
-verify_jwt = false
+verify_jwt = true
 
 [functions.suggest]
-verify_jwt = false
+verify_jwt = true

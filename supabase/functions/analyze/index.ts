@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -542,6 +543,22 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    // Require an authenticated user
+    const authHeader = req.headers.get("Authorization") || "";
+    const token = authHeader.replace(/^Bearer\s+/i, "");
+    const supa = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: `Bearer ${token}` } } },
+    );
+    const { data: userData, error: userErr } = await supa.auth.getUser(token);
+    if (userErr || !userData?.user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const body = await req.json();
     const { code, language, explanation_level, stream, project_name, total_files } = body;
 
@@ -552,6 +569,21 @@ serve(async (req) => {
     // Increased limit for large projects: 5MB
     if (code.length > 5_000_000) {
       return new Response(JSON.stringify({ error: "Code exceeds 5MB limit. Try uploading fewer files." }), { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Server-side credit check + deduction (atomic, RLS-protected RPC)
+    let creditsTotal = 0;
+    let creditsUsed = 0;
+    {
+      const { data: creditRow, error: creditErr } = await supa.rpc("deduct_user_credit");
+      if (creditErr || !creditRow || !creditRow[0]) {
+        return new Response(
+          JSON.stringify({ error: creditErr?.message || "No credits remaining" }),
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      creditsTotal = creditRow[0].total_credits;
+      creditsUsed = creditRow[0].used_credits;
     }
 
     const detectedLang = language || detectLanguage(code);
