@@ -463,11 +463,14 @@ const Analysis = () => {
     setIsStreaming(true);
     setActiveResultTab("overview");
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) { toast.error("Please sign in to analyze code."); setLoading(false); setIsStreaming(false); return; }
       const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
           code: analyzeCode,
@@ -569,7 +572,7 @@ const Analysis = () => {
       };
       const resp = await fetch(CHAT_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token ?? ""}` },
         body: JSON.stringify({ messages: [contextMsg, ...newMessages] }),
       });
       if (!resp.ok || !resp.body) throw new Error("Chat failed");
@@ -1087,7 +1090,7 @@ const Analysis = () => {
                           try {
                             const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/suggest`, {
                               method: "POST",
-                              headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+                              headers: { "Content-Type": "application/json", Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token ?? ""}` },
                               body: JSON.stringify({ code: combinedCode, analysis: result }),
                             });
                             if (!resp.ok) { const err = await resp.json().catch(() => ({ error: "Failed" })); toast.error(err.error || "Failed"); return; }

@@ -204,6 +204,7 @@ const Demo = () => {
 
   const handleAnalyze = async () => {
     if (!code.trim()) return;
+    if (!user) { toast.error("Please sign in to analyze code."); return; }
     if (remainingCredits <= 0) { toast.error("No demo credits remaining."); return; }
     setLoading(true);
     setResult(null);
@@ -211,11 +212,14 @@ const Demo = () => {
     setIsStreaming(true);
 
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) { toast.error("Please sign in to analyze code."); return; }
       const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ code, explanation_level: "Intermediate", stream: true }),
       });
@@ -261,15 +265,17 @@ const Demo = () => {
         if (finalResult) {
           setResult(finalResult);
           if (user) {
-            // Deduct credit server-side (prevents tampering)
-            const { data: creditData, error: creditErr } = await (supabase as any).rpc("deduct_user_credit");
-            if (creditErr) {
-              console.error("Credit deduction failed:", creditErr);
-            } else if (creditData && creditData[0]) {
-              const row = creditData[0];
-              const newRemaining = row.total_credits - row.used_credits;
-              setCredits({ total: row.total_credits, used: row.used_credits });
-              toast.info(`${newRemaining} demo credit${newRemaining !== 1 ? "s" : ""} remaining`);
+            // Credit was already deducted server-side by the analyze function.
+            // Refresh the local count from the database.
+            const { data: creditRow } = await supabase
+              .from("user_credits")
+              .select("total_credits, used_credits")
+              .eq("user_id", user.id)
+              .maybeSingle();
+            if (creditRow) {
+              const newRemaining = creditRow.total_credits - creditRow.used_credits;
+              setCredits({ total: creditRow.total_credits, used: creditRow.used_credits });
+              toast.info(`${newRemaining} credit${newRemaining !== 1 ? "s" : ""} remaining`);
             }
 
             supabase.from("analyses").insert({
@@ -289,13 +295,6 @@ const Demo = () => {
             }).then(({ error }) => {
               if (!error) toast.success("Analysis saved to history!");
             });
-          } else {
-            // Deduct credit from localStorage for anonymous users
-            const newUsed = (credits?.used ?? 0) + 1;
-            const newRemaining = (credits?.total ?? 5) - newUsed;
-            localStorage.setItem("demo_credits_used", String(newUsed));
-            setCredits(prev => prev ? { ...prev, used: newUsed } : prev);
-            toast.info(`${newRemaining} demo credit${newRemaining !== 1 ? "s" : ""} remaining`);
           }
         }
       } else {
@@ -347,7 +346,7 @@ const Demo = () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token ?? ""}`,
         },
         body: JSON.stringify({ messages: [contextMsg, ...newMessages] }),
       });
@@ -715,7 +714,7 @@ const Demo = () => {
                             method: "POST",
                             headers: {
                               "Content-Type": "application/json",
-                              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+                              Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token ?? ""}`,
                             },
                             body: JSON.stringify({ code, analysis: result }),
                           });
