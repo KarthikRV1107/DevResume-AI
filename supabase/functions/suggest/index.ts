@@ -48,15 +48,6 @@ serve(async (req) => {
       });
     }
 
-    // Deduct one credit before invoking the paid AI gateway
-    const { error: creditErr } = await supa.rpc("deduct_user_credit");
-    if (creditErr) {
-      return new Response(JSON.stringify({ error: "No credits remaining" }), {
-        status: 402,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const cap = <T,>(arr: T[] | undefined): T[] => (Array.isArray(arr) ? arr.slice(0, 10) : []);
     const safeAnalysis = {
       goal: typeof analysis.goal === "string" ? analysis.goal.slice(0, 500) : "Unknown",
