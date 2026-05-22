@@ -53,15 +53,6 @@ serve(async (req) => {
       });
     }
 
-    // Deduct one credit before invoking the paid AI gateway
-    const { error: creditErr } = await supa.rpc("deduct_user_credit");
-    if (creditErr) {
-      return new Response(JSON.stringify({ error: "No credits remaining" }), {
-        status: 402,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 

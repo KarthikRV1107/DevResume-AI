@@ -571,21 +571,6 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Code exceeds 5MB limit. Try uploading fewer files." }), { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Server-side credit check + deduction (atomic, RLS-protected RPC)
-    let creditsTotal = 0;
-    let creditsUsed = 0;
-    {
-      const { data: creditRow, error: creditErr } = await supa.rpc("deduct_user_credit");
-      if (creditErr || !creditRow || !creditRow[0]) {
-        return new Response(
-          JSON.stringify({ error: creditErr?.message || "No credits remaining" }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
-      creditsTotal = creditRow[0].total_credits;
-      creditsUsed = creditRow[0].used_credits;
-    }
-
     const detectedLang = language || detectLanguage(code);
     const issues = staticAnalyze(code, detectedLang);
     const securityFindings = enterpriseSecurityScan(code, detectedLang);
