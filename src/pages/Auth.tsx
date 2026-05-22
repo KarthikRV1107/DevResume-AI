@@ -42,7 +42,7 @@ const Auth = () => {
         navigate("/");
       } else {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `https://resume-code-boost.vercel.app/reset-password`,
+          redirectTo: `https://devresume-ai.lovable.app/reset-password`,
         });
         if (error) throw error;
         toast.success("Password reset email sent!");
