@@ -808,7 +808,7 @@ ${code.slice(0, 60000)}
             controller.close();
           } catch (e) {
             console.error("Stream error:", e);
-            controller.enqueue(encoder.encode(sseMessage({ type: "error", message: e instanceof Error ? e.message : "Unknown error" })));
+            controller.enqueue(encoder.encode(sseMessage({ type: "error", message: "Analysis failed. Please try again." })));
             controller.close();
           }
         },
