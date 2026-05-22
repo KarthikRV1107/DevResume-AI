@@ -89,6 +89,15 @@ export function exportAsMarkdown(analysis: ExportableAnalysis) {
   download(md, `${name}.md`, "text/markdown");
 }
 
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export function exportAsPDF(analysis: ExportableAnalysis) {
   const md = toMarkdown(analysis);
   // Build a styled HTML document for print-to-PDF
@@ -115,7 +124,9 @@ export function exportAsPDF(analysis: ExportableAnalysis) {
 }
 
 function markdownToHtml(md: string): string {
-  return md
+  // Escape all HTML first so user/AI content cannot inject tags or scripts,
+  // then apply markdown transforms on the safe string.
+  return escapeHtml(md)
     .replace(/^### (.+)$/gm, "<h3>$1</h3>")
     .replace(/^## (.+)$/gm, "<h2>$1</h2>")
     .replace(/^# (.+)$/gm, "<h1>$1</h1>")
