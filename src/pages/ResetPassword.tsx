@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Terminal, Lock, ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,20 @@ import Background3D from "@/components/Background3D";
 const ResetPassword = () => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [ready, setReady] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Supabase emits PASSWORD_RECOVERY when the user lands from the email link.
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") setReady(true);
+    });
+    // Also check if a session already exists (link already consumed).
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) setReady(true);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,7 +62,11 @@ const ResetPassword = () => {
         </div>
 
         <h1 className="text-2xl font-bold text-foreground mb-1">Set new password</h1>
-        <p className="text-sm text-muted-foreground mb-6">Enter your new password below.</p>
+        <p className="text-sm text-muted-foreground mb-6">
+          {ready
+            ? "Enter your new password below."
+            : "Waiting for recovery link... Open this page from the reset email."}
+        </p>
 
         <form onSubmit={handleReset} className="space-y-4">
           <div className="space-y-2">
@@ -69,7 +86,7 @@ const ResetPassword = () => {
             </div>
           </div>
 
-          <Button variant="hero" type="submit" className="w-full" disabled={loading}>
+          <Button variant="hero" type="submit" className="w-full" disabled={loading || !ready}>
             {loading && <Loader2 className="animate-spin mr-2 w-4 h-4" />}
             Update Password
           </Button>
