@@ -28,6 +28,40 @@ serve(async (req) => {
     }
 
     const { messages } = await req.json();
+
+    // Input validation: enforce message count and size limits
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return new Response(JSON.stringify({ error: "Invalid messages payload" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (messages.length > 50) {
+      return new Response(JSON.stringify({ error: "Too many messages (max 50)" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const totalLen = messages.reduce(
+      (s: number, m: { content?: string }) => s + (typeof m?.content === "string" ? m.content.length : 0),
+      0,
+    );
+    if (totalLen > 20000) {
+      return new Response(JSON.stringify({ error: "Message content too large (max 20,000 chars)" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Deduct one credit before invoking the paid AI gateway
+    const { error: creditErr } = await supa.rpc("deduct_user_credit");
+    if (creditErr) {
+      return new Response(JSON.stringify({ error: "No credits remaining" }), {
+        status: 402,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -78,7 +112,7 @@ serve(async (req) => {
   } catch (e) {
     console.error("chat error:", e);
     return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
+      JSON.stringify({ error: "Internal server error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

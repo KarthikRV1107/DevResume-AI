@@ -26,13 +26,48 @@ serve(async (req) => {
       });
     }
 
-    const { code, analysis } = await req.json();
+    const body = await req.json();
+    const bodyStr = JSON.stringify(body);
+    if (bodyStr.length > 100_000) {
+      return new Response(JSON.stringify({ error: "Payload too large" }), {
+        status: 413,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { code, analysis } = body;
     if (!code || !analysis) {
       return new Response(JSON.stringify({ error: "Missing code or analysis" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    if (typeof code !== "string") {
+      return new Response(JSON.stringify({ error: "Invalid code" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Deduct one credit before invoking the paid AI gateway
+    const { error: creditErr } = await supa.rpc("deduct_user_credit");
+    if (creditErr) {
+      return new Response(JSON.stringify({ error: "No credits remaining" }), {
+        status: 402,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const cap = <T,>(arr: T[] | undefined): T[] => (Array.isArray(arr) ? arr.slice(0, 10) : []);
+    const safeAnalysis = {
+      goal: typeof analysis.goal === "string" ? analysis.goal.slice(0, 500) : "Unknown",
+      language: typeof analysis.language === "string" ? analysis.language.slice(0, 50) : "Unknown",
+      next_steps: cap<string>(analysis.next_steps).map((s) => String(s).slice(0, 500)),
+      risks: cap<string>(analysis.risks).map((s) => String(s).slice(0, 500)),
+      issues: cap<{ type?: string; message?: string }>(analysis.issues),
+      architectural_improvements: cap<string>(analysis.architectural_improvements).map((s) =>
+        String(s).slice(0, 500),
+      ),
+    };
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
@@ -52,12 +87,12 @@ ${code.slice(0, 6000)}
 \`\`\`
 
 ## Analysis
-- Goal: ${analysis.goal || "Unknown"}
-- Language: ${analysis.language || "Unknown"}
-- Next steps: ${(analysis.next_steps || []).join("; ")}
-- Risks: ${(analysis.risks || []).join("; ")}
-- Issues: ${(analysis.issues || []).map((i: any) => `${i.type}: ${i.message}`).join("; ")}
-- Architectural improvements: ${(analysis.architectural_improvements || []).join("; ")}
+- Goal: ${safeAnalysis.goal}
+- Language: ${safeAnalysis.language}
+- Next steps: ${safeAnalysis.next_steps.join("; ")}
+- Risks: ${safeAnalysis.risks.join("; ")}
+- Issues: ${safeAnalysis.issues.map((i) => `${i?.type}: ${i?.message}`).join("; ")}
+- Architectural improvements: ${safeAnalysis.architectural_improvements.join("; ")}
 
 Generate fix suggestions based on the above analysis.`;
 
@@ -143,7 +178,7 @@ Generate fix suggestions based on the above analysis.`;
     });
   } catch (e) {
     console.error("suggest error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
