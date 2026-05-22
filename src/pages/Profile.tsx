@@ -57,6 +57,12 @@ const Profile = () => {
       return;
     }
 
+    const ALLOWED_MIME = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if (!ALLOWED_MIME.includes(file.type)) {
+      toast.error("Only JPEG, PNG, GIF, or WebP images are allowed");
+      return;
+    }
+
     setUploading(true);
     const ext = file.name.split(".").pop();
     const path = `${user.id}/avatar.${ext}`;
