@@ -119,7 +119,7 @@ const Profile = () => {
     if (!user?.email) return;
     setResetting(true);
     const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `https://resume-code-boost.vercel.app/reset-password`,
     });
     if (error) {
       toast.error("Failed to send reset email: " + error.message);
