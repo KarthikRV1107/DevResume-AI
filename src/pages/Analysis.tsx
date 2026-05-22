@@ -101,9 +101,9 @@ const ALLOWED_EXTENSIONS = [
   ".editorconfig", ".eslintrc", ".prettierrc", ".babelrc",
 ];
 
-const MAX_FILE_SIZE = 2 * 1024 * 1024;
-const MAX_FILES = 500;
-const MAX_TOTAL_SIZE = 50 * 1024 * 1024;
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_FILES = 5000;
+const MAX_TOTAL_SIZE = 500 * 1024 * 1024;
 
 const QUICK_PROMPTS = [
   "What's the biggest risk in this code?",
