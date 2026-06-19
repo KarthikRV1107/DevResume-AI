@@ -10,8 +10,8 @@ const Index = () => (
     <Background3D />
     <Navbar />
     <Hero />
-    <Features />
     <Demo />
+    <Features />
     <Footer />
   </div>
 );
