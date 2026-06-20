@@ -18,8 +18,6 @@ import ThemeToggle from "@/components/ThemeToggle";
 const links = [
   { label: "Features", href: "#features" },
   { label: "Demo", href: "#demo" },
-  { label: "Team", href: "#team" },
-  { label: "Pitch", href: "#pitch" },
 ];
 
 const Navbar = () => {
