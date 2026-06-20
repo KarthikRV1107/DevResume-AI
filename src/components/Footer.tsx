@@ -13,8 +13,6 @@ const Footer = () => (
         <div className="flex items-center gap-6 text-sm text-muted-foreground">
           <a href="#features" className="hover:text-primary transition-colors">Features</a>
           <a href="#demo" className="hover:text-primary transition-colors">Demo</a>
-          <a href="#team" className="hover:text-primary transition-colors">Team</a>
-          <a href="#pitch" className="hover:text-primary transition-colors">Pitch</a>
         </div>
       </div>
       <div className="mt-6 text-center text-xs text-muted-foreground/60 font-mono">
