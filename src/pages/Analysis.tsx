@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { useLocation } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import Navbar from "@/components/Navbar";
 import Background3D from "@/components/Background3D";
@@ -253,6 +254,7 @@ function FileTreeNode({ node, selectedFile, onSelectFile, expandedFolders, onTog
 
 const Analysis = () => {
   const { user } = useAuth();
+  const location = useLocation();
   const [code, setCode] = useState("");
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -302,6 +304,21 @@ const Analysis = () => {
   useEffect(() => {
     if (chatOpen) chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages, chatOpen]);
+
+  // Prefill code when re-analyzing from History page
+  useEffect(() => {
+    const state: any = location.state;
+    if (state?.reanalyzeCode) {
+      setCode(state.reanalyzeCode);
+      if (state.projectName) setProjectName(state.projectName);
+      setUploadedFiles([]);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      toast.success("Code loaded — click Analyze to re-run");
+      // clear state so it doesn't re-trigger
+      window.history.replaceState({}, "");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const toggleFolder = useCallback((path: string) => {
     setExpandedFolders(prev => {
