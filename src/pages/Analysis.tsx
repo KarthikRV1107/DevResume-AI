@@ -1091,7 +1091,7 @@ const Analysis = () => {
                             const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/suggest`, {
                               method: "POST",
                               headers: { "Content-Type": "application/json", Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token ?? ""}` },
-                              body: JSON.stringify({ code: combinedCode, analysis: result }),
+                              body: JSON.stringify({ code: combinedCode.slice(0, 50000), analysis: result }),
                             });
                             if (!resp.ok) { const err = await resp.json().catch(() => ({ error: "Failed" })); toast.error(err.error || "Failed"); return; }
                             const data = await resp.json();
