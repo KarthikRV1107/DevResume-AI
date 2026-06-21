@@ -716,7 +716,7 @@ const Demo = () => {
                               "Content-Type": "application/json",
                               Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token ?? ""}`,
                             },
-                            body: JSON.stringify({ code, analysis: result }),
+                            body: JSON.stringify({ code: code.slice(0, 50000), analysis: result }),
                           });
                           if (!resp.ok) {
                             const err = await resp.json().catch(() => ({ error: "Failed" }));
