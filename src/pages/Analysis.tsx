@@ -305,6 +305,21 @@ const Analysis = () => {
     if (chatOpen) chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages, chatOpen]);
 
+  // Prefill code when re-analyzing from History page
+  useEffect(() => {
+    const state: any = location.state;
+    if (state?.reanalyzeCode) {
+      setCode(state.reanalyzeCode);
+      if (state.projectName) setProjectName(state.projectName);
+      setUploadedFiles([]);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      toast.success("Code loaded — click Analyze to re-run");
+      // clear state so it doesn't re-trigger
+      window.history.replaceState({}, "");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const toggleFolder = useCallback((path: string) => {
     setExpandedFolders(prev => {
       const next = new Set(prev);
