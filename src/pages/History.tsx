@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Terminal, ArrowLeft, Clock, Code, Brain, Trash2, ChevronRight, AlertTriangle, Zap, Download, FileText } from "lucide-react";
+import { ArrowLeft, Clock, Code, Brain, Trash2, ChevronRight, AlertTriangle, Download, FileText, Shield, ShieldCheck, Package, Scale, RotateCcw, Lightbulb, Bug } from "lucide-react";
 import { exportAsMarkdown, exportAsPDF } from "@/lib/exportAnalysis";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,18 +10,72 @@ import { toast } from "sonner";
 import Background3D from "@/components/Background3D";
 import Navbar from "@/components/Navbar";
 
+interface SecurityFinding {
+  category?: string;
+  severity: string;
+  title: string;
+  description?: string;
+  owasp?: string;
+  cwe?: string;
+  remediation?: string;
+}
+interface DependencyFinding {
+  package: string;
+  version?: string;
+  severity: string;
+  issue: string;
+  recommendation?: string;
+}
+interface ComplianceCheck {
+  framework: string;
+  control: string;
+  status: "pass" | "fail" | "warning" | "not_applicable" | string;
+  description?: string;
+  remediation?: string;
+}
+interface IssueItem { type?: string; message: string; severity?: string; line?: number }
+
 interface Analysis {
   id: string;
   code: string;
   language: string | null;
   goal: string | null;
+  project_name: string | null;
+  current_state: string | null;
   completion_percentage: number | null;
   effort_level: string | null;
   next_steps: string[];
   risks: string[];
+  issues: IssueItem[];
+  architectural_improvements: string[];
+  security_issues: SecurityFinding[];
+  dependency_audit: DependencyFinding[];
+  compliance_checks: ComplianceCheck[];
   confidence_score: number | null;
+  total_files: number | null;
   created_at: string;
 }
+
+type TabKey = "overview" | "security" | "dependencies" | "compliance";
+
+const severityColor = (sev?: string) => {
+  switch ((sev || "").toLowerCase()) {
+    case "critical": return "text-red-400 bg-red-500/10 border-red-500/20";
+    case "high": return "text-orange-400 bg-orange-500/10 border-orange-500/20";
+    case "medium": return "text-yellow-400 bg-yellow-500/10 border-yellow-500/20";
+    case "low": return "text-blue-400 bg-blue-500/10 border-blue-500/20";
+    default: return "text-muted-foreground bg-secondary border-border";
+  }
+};
+
+const statusBadge = (status: string) => {
+  switch (status) {
+    case "pass": return "text-green-400 bg-green-500/10 border-green-500/20";
+    case "fail": return "text-red-400 bg-red-500/10 border-red-500/20";
+    case "warning": return "text-yellow-400 bg-yellow-500/10 border-yellow-500/20";
+    default: return "text-muted-foreground bg-secondary border-border";
+  }
+};
 
 const History = () => {
   const { user, loading: authLoading } = useAuth();
@@ -29,6 +83,7 @@ const History = () => {
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Analysis | null>(null);
+  const [tab, setTab] = useState<TabKey>("overview");
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -51,6 +106,11 @@ const History = () => {
           ...d,
           next_steps: Array.isArray(d.next_steps) ? d.next_steps : [],
           risks: Array.isArray(d.risks) ? d.risks : [],
+          issues: Array.isArray(d.issues) ? d.issues : [],
+          architectural_improvements: Array.isArray(d.architectural_improvements) ? d.architectural_improvements : [],
+          security_issues: Array.isArray(d.security_issues) ? d.security_issues : [],
+          dependency_audit: Array.isArray(d.dependency_audit) ? d.dependency_audit : [],
+          compliance_checks: Array.isArray(d.compliance_checks) ? d.compliance_checks : [],
         })));
       }
       setLoading(false);
@@ -67,6 +127,10 @@ const History = () => {
       if (selected?.id === id) setSelected(null);
       toast.success("Analysis deleted");
     }
+  };
+
+  const reanalyze = (a: Analysis) => {
+    navigate("/analysis", { state: { reanalyzeCode: a.code, projectName: a.project_name || "" } });
   };
 
   if (authLoading || !user) return null;
@@ -108,6 +172,7 @@ const History = () => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.05 }}
                   onClick={() => setSelected(a)}
+                  onDoubleClick={() => setTab("overview")}
                   className={`cursor-pointer rounded-lg border p-4 transition-all duration-200 ${
                     selected?.id === a.id
                       ? "border-primary bg-primary/5 glow-border"
