@@ -254,6 +254,7 @@ function FileTreeNode({ node, selectedFile, onSelectFile, expandedFolders, onTog
 
 const Analysis = () => {
   const { user } = useAuth();
+  const location = useLocation();
   const [code, setCode] = useState("");
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
