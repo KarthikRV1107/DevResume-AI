@@ -33,7 +33,7 @@ interface ComplianceCheck {
   description?: string;
   remediation?: string;
 }
-interface IssueItem { type?: string; message: string; severity?: string; line?: number }
+interface IssueItem { type: string; message: string; severity: string; line?: number }
 
 interface Analysis {
   id: string;
