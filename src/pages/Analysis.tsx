@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { useLocation } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import Navbar from "@/components/Navbar";
 import Background3D from "@/components/Background3D";
