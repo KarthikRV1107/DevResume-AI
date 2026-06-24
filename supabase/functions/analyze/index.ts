@@ -86,6 +86,7 @@ function langFromFilename(name: string): string | null {
 }
 
 function detectLanguage(code: string): string {
+  const preview = code.slice(0, 80).replace(/\n/g, "\\n");
   // 1. Prefer file path markers from multi-file uploads: "// ═══ path/file.ext ═══"
   const markerRe = /═══\s*([^═\n]+?)\s*═══/g;
   const counts: Record<string, number> = {};
@@ -118,18 +119,33 @@ function detectLanguage(code: string): string {
   // 4. Heuristic signatures
   let best = "Unknown";
   let bestScore = 0;
+  const scores: Record<string, number> = {};
   for (const sig of LANG_SIGNATURES) {
     let score = 0;
     for (const kw of sig.keywords) if (kw.test(code)) score += 2;
     for (const p of sig.patterns) if (p.test(code)) score += 1;
+    if (score > 0) scores[sig.name] = score;
     if (score > bestScore) { bestScore = score; best = sig.name; }
   }
-  if (bestScore >= 1) return best;
+  if (bestScore >= 1) {
+    console.log(`[detectLanguage] heuristic fallback → ${best} (score=${bestScore}) scores=${JSON.stringify(scores)} len=${code.length} preview="${preview}"`);
+    return best;
+  }
 
   // 5. Last-resort lightweight checks
-  if (/\b(SELECT|INSERT|UPDATE|DELETE|CREATE\s+TABLE)\b/i.test(code)) return "SQL";
-  if (/^\s*[\w-]+\s*:\s*\S/m.test(code) && /---|^\s*-\s+\w+/m.test(code)) return "YAML";
-  if (/^#\s+.+/m.test(code) && /\[.+\]\(.+\)/.test(code)) return "Markdown";
+  if (/\b(SELECT|INSERT|UPDATE|DELETE|CREATE\s+TABLE)\b/i.test(code)) {
+    console.log(`[detectLanguage] last-resort → SQL len=${code.length} preview="${preview}"`);
+    return "SQL";
+  }
+  if (/^\s*[\w-]+\s*:\s*\S/m.test(code) && /---|^\s*-\s+\w+/m.test(code)) {
+    console.log(`[detectLanguage] last-resort → YAML len=${code.length} preview="${preview}"`);
+    return "YAML";
+  }
+  if (/^#\s+.+/m.test(code) && /\[.+\]\(.+\)/.test(code)) {
+    console.log(`[detectLanguage] last-resort → Markdown len=${code.length} preview="${preview}"`);
+    return "Markdown";
+  }
+  console.warn(`[detectLanguage] UNDETECTED → "${best}" (no signatures matched) len=${code.length} preview="${preview}"`);
   return best;
 }
 
