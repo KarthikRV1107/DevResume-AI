@@ -86,20 +86,17 @@ function langFromFilename(name: string): string | null {
 }
 
 function detectLanguage(code: string): string {
-  // 1. Prefer file path markers from multi-file uploads
-  const fileMarkers = code.match(/\/\/\s*═══\s*([^\s═]+(?:\.[a-zA-Z0-9]+|Dockerfile|Makefile))[^═]*═══/g) || [];
-  if (fileMarkers.length > 0) {
-    const counts: Record<string, number> = {};
-    for (const m of fileMarkers) {
-      const match = m.match(/═══\s*(\S+?)\s*═══/);
-      if (!match) continue;
-      const lang = langFromFilename(match[1]);
-      if (lang) counts[lang] = (counts[lang] || 0) + 1;
-    }
-    const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-    if (entries.length === 1) return entries[0][0];
-    if (entries.length > 1) return `${entries[0][0]} (+${entries.length - 1} more)`;
+  // 1. Prefer file path markers from multi-file uploads: "// ═══ path/file.ext ═══"
+  const markerRe = /═══\s*([^═\n]+?)\s*═══/g;
+  const counts: Record<string, number> = {};
+  let mm: RegExpExecArray | null;
+  while ((mm = markerRe.exec(code)) !== null) {
+    const lang = langFromFilename(mm[1]);
+    if (lang) counts[lang] = (counts[lang] || 0) + 1;
   }
+  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  if (entries.length === 1) return entries[0][0];
+  if (entries.length > 1) return `${entries[0][0]} (+${entries.length - 1} more)`;
 
   // 2. Shebang detection
   const shebang = code.match(/^#!\s*\S*\/(\w+)/);
@@ -127,13 +124,13 @@ function detectLanguage(code: string): string {
     for (const p of sig.patterns) if (p.test(code)) score += 1;
     if (score > bestScore) { bestScore = score; best = sig.name; }
   }
-  if (bestScore >= 2) return best;
+  if (bestScore >= 1) return best;
 
   // 5. Last-resort lightweight checks
   if (/\b(SELECT|INSERT|UPDATE|DELETE|CREATE\s+TABLE)\b/i.test(code)) return "SQL";
   if (/^\s*[\w-]+\s*:\s*\S/m.test(code) && /---|^\s*-\s+\w+/m.test(code)) return "YAML";
   if (/^#\s+.+/m.test(code) && /\[.+\]\(.+\)/.test(code)) return "Markdown";
-  return best === "Unknown" ? "Plain Text" : best;
+  return best;
 }
 
 // ─── Static Analysis ──────────────────────────────────────────────────
