@@ -29,7 +29,96 @@ const LANG_SIGNATURES: LangSignature[] = [
   { name: "Kotlin", keywords: [/\bfun\b/, /\bval\b/, /\bvar\b/, /\bdata\s+class\b/], patterns: [/\bwhen\b/, /\bcompanion\s+object\b/, /\bsuspend\b/, /\bcoroutine/i] },
 ];
 
+// Map file extensions to language names
+const EXT_TO_LANG: Record<string, string> = {
+  py: "Python", pyw: "Python", ipynb: "Python",
+  ts: "TypeScript", tsx: "TypeScript", mts: "TypeScript", cts: "TypeScript",
+  js: "JavaScript", jsx: "JavaScript", mjs: "JavaScript", cjs: "JavaScript",
+  java: "Java",
+  cpp: "C++", cc: "C++", cxx: "C++", hpp: "C++", hh: "C++", hxx: "C++",
+  c: "C", h: "C",
+  go: "Go",
+  rs: "Rust",
+  cs: "C#",
+  php: "PHP",
+  rb: "Ruby",
+  swift: "Swift",
+  kt: "Kotlin", kts: "Kotlin",
+  html: "HTML", htm: "HTML",
+  css: "CSS", scss: "SCSS", sass: "SASS", less: "LESS",
+  json: "JSON", jsonc: "JSON",
+  yml: "YAML", yaml: "YAML",
+  toml: "TOML",
+  xml: "XML",
+  md: "Markdown", mdx: "Markdown",
+  sh: "Shell", bash: "Shell", zsh: "Shell",
+  sql: "SQL",
+  dart: "Dart",
+  scala: "Scala", sc: "Scala",
+  lua: "Lua",
+  r: "R",
+  pl: "Perl", pm: "Perl",
+  ex: "Elixir", exs: "Elixir",
+  erl: "Erlang",
+  hs: "Haskell",
+  clj: "Clojure", cljs: "Clojure",
+  vue: "Vue",
+  svelte: "Svelte",
+  dockerfile: "Dockerfile",
+  tf: "Terraform",
+  ps1: "PowerShell",
+  bat: "Batch", cmd: "Batch",
+  m: "Objective-C", mm: "Objective-C",
+  groovy: "Groovy", gradle: "Groovy",
+  proto: "Protobuf",
+  graphql: "GraphQL", gql: "GraphQL",
+  ini: "INI", cfg: "INI", conf: "INI",
+  env: "Env",
+  txt: "Text",
+};
+
+function langFromFilename(name: string): string | null {
+  const lower = name.toLowerCase().trim();
+  if (lower === "dockerfile" || lower.endsWith("/dockerfile")) return "Dockerfile";
+  if (lower === "makefile" || lower.endsWith("/makefile")) return "Makefile";
+  const ext = lower.split(".").pop() || "";
+  return EXT_TO_LANG[ext] || null;
+}
+
 function detectLanguage(code: string): string {
+  // 1. Prefer file path markers from multi-file uploads
+  const fileMarkers = code.match(/\/\/\s*═══\s*([^\s═]+(?:\.[a-zA-Z0-9]+|Dockerfile|Makefile))[^═]*═══/g) || [];
+  if (fileMarkers.length > 0) {
+    const counts: Record<string, number> = {};
+    for (const m of fileMarkers) {
+      const match = m.match(/═══\s*(\S+?)\s*═══/);
+      if (!match) continue;
+      const lang = langFromFilename(match[1]);
+      if (lang) counts[lang] = (counts[lang] || 0) + 1;
+    }
+    const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    if (entries.length === 1) return entries[0][0];
+    if (entries.length > 1) return `${entries[0][0]} (+${entries.length - 1} more)`;
+  }
+
+  // 2. Shebang detection
+  const shebang = code.match(/^#!\s*\S*\/(\w+)/);
+  if (shebang) {
+    const s = shebang[1].toLowerCase();
+    if (s.includes("python")) return "Python";
+    if (s.includes("node")) return "JavaScript";
+    if (s.includes("bash") || s.includes("sh") || s.includes("zsh")) return "Shell";
+    if (s.includes("ruby")) return "Ruby";
+    if (s.includes("perl")) return "Perl";
+    if (s.includes("php")) return "PHP";
+  }
+
+  // 3. Strong structural hints
+  if (/^\s*<\?php\b/.test(code)) return "PHP";
+  if (/^\s*<!DOCTYPE\s+html|^\s*<html[\s>]/i.test(code)) return "HTML";
+  if (/^\s*\{[\s\S]*\}\s*$/.test(code.trim()) && /^\s*"[^"]+"\s*:/m.test(code)) return "JSON";
+
+  // 4. Heuristic signatures
   let best = "Unknown";
   let bestScore = 0;
   for (const sig of LANG_SIGNATURES) {
@@ -38,7 +127,13 @@ function detectLanguage(code: string): string {
     for (const p of sig.patterns) if (p.test(code)) score += 1;
     if (score > bestScore) { bestScore = score; best = sig.name; }
   }
-  return best;
+  if (bestScore >= 2) return best;
+
+  // 5. Last-resort lightweight checks
+  if (/\b(SELECT|INSERT|UPDATE|DELETE|CREATE\s+TABLE)\b/i.test(code)) return "SQL";
+  if (/^\s*[\w-]+\s*:\s*\S/m.test(code) && /---|^\s*-\s+\w+/m.test(code)) return "YAML";
+  if (/^#\s+.+/m.test(code) && /\[.+\]\(.+\)/.test(code)) return "Markdown";
+  return best === "Unknown" ? "Plain Text" : best;
 }
 
 // ─── Static Analysis ──────────────────────────────────────────────────
