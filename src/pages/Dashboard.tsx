@@ -64,7 +64,7 @@ const Dashboard = () => {
   const languageData = useMemo(() => {
     const counts: Record<string, number> = {};
     analyses.forEach((a) => {
-      const lang = a.language || "Unknown";
+      const lang = a.language && a.language !== "Unknown" ? a.language : "Plain Text";
       counts[lang] = (counts[lang] || 0) + 1;
     });
     return Object.entries(counts)
@@ -101,7 +101,7 @@ const Dashboard = () => {
         label: `${date.getMonth() + 1}/${date.getDate()}`,
         score,
         rollingAvg,
-        language: a.language || "Unknown",
+        language: a.language && a.language !== "Unknown" ? a.language : "Plain Text",
         confidence: Math.round((Number(a.confidence_score) || 0) * 100),
       };
     });
