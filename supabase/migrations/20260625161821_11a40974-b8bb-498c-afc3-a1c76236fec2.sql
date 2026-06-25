@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.deduct_user_credit() FROM authenticated, anon, PUBLIC;
