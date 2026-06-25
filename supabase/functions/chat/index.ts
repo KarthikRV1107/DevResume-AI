@@ -53,6 +53,31 @@ serve(async (req) => {
       });
     }
 
+    // Whitelist roles: only allow user/assistant from clients to prevent
+    // system-prompt injection via role override.
+    const sanitizedMessages: { role: "user" | "assistant"; content: string }[] = [];
+    for (const m of messages as Array<{ role?: unknown; content?: unknown }>) {
+      if (!m || typeof m !== "object") {
+        return new Response(JSON.stringify({ error: "Invalid message entry" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (m.role !== "user" && m.role !== "assistant") {
+        return new Response(JSON.stringify({ error: "Invalid message role" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (typeof m.content !== "string") {
+        return new Response(JSON.stringify({ error: "Invalid message content" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      sanitizedMessages.push({ role: m.role, content: m.content });
+    }
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -69,7 +94,7 @@ serve(async (req) => {
             role: "system",
             content: "You are DevResume AI assistant. You help developers understand their unfinished code, suggest next steps, explain architecture decisions, and debug issues. Keep answers concise, practical, and code-focused. Use markdown for code snippets.",
           },
-          ...messages,
+          ...sanitizedMessages,
         ],
         stream: true,
       }),
