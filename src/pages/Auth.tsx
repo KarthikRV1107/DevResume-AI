@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 import { toast } from "sonner";
 import { useNavigate, Link } from "react-router-dom";
 import Background3D from "@/components/Background3D";
@@ -23,16 +22,17 @@ const Auth = () => {
   const handleGoogle = async () => {
     setLoading(true);
     try {
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/`,
+          queryParams: { prompt: "select_account" },
+        },
       });
-      if (result.error) throw result.error;
-      if (result.redirected) return;
-      toast.success("Welcome!");
-      navigate("/");
+      if (error) throw error;
+      // Browser redirects to Google.
     } catch (err: any) {
       toast.error(err?.message || "Google sign-in failed");
-    } finally {
       setLoading(false);
     }
   };
