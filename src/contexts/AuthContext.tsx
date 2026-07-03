@@ -23,19 +23,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
+
+    const validateSession = async (nextSession: Session | null) => {
+      if (!nextSession?.access_token) {
+        if (mounted) setSession(null);
+        return;
+      }
+
+      const { data, error } = await supabase.auth.getUser(nextSession.access_token);
+      if (error || !data.user) {
+        await supabase.auth.signOut();
+        if (mounted) setSession(null);
+        return;
+      }
+
+      if (mounted) setSession(nextSession);
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        setSession(session);
-        setLoading(false);
+        validateSession(session).finally(() => {
+          if (mounted) setLoading(false);
+        });
       }
     );
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setLoading(false);
+      validateSession(session).finally(() => {
+        if (mounted) setLoading(false);
+      });
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signOut = async () => {
