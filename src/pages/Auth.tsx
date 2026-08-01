@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import Background3D from "@/components/Background3D";
 
 type Mode = "login" | "signup" | "forgot";
@@ -18,6 +18,12 @@ const Auth = () => {
   const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Same-origin relative path to return to after auth (used by the OAuth consent flow).
+  const rawNext = searchParams.get("next") ?? "";
+  const nextPath = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "";
+  const returnUrl = `${window.location.origin}${nextPath || "/"}`;
 
   const handleGoogle = async () => {
     setLoading(true);
@@ -25,7 +31,7 @@ const Auth = () => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/`,
+          redirectTo: returnUrl,
           queryParams: { prompt: "select_account" },
         },
       });
@@ -47,7 +53,7 @@ const Auth = () => {
           email,
           password,
           options: {
-            emailRedirectTo: window.location.origin,
+            emailRedirectTo: returnUrl,
             data: { username },
           },
         });
@@ -57,7 +63,11 @@ const Auth = () => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         toast.success("Welcome back!");
-        navigate("/");
+        if (nextPath) {
+          window.location.href = nextPath;
+        } else {
+          navigate("/");
+        }
       } else {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: `https://devresume-ai.lovable.app/reset-password`,
