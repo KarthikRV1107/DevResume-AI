@@ -1,0 +1,172 @@
+{
+  "version": 1,
+  "sdk_version": "0.26.1",
+  "path": "/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://fxpkhwazdiscoesaiskh.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "code-context-guardian",
+      "version": "0.1.0",
+      "title": "Code Context Guardian"
+    },
+    "tools": [
+      {
+        "name": "list_analyses",
+        "title": "List code analyses",
+        "description": "List the signed-in user's saved code analyses, newest first, with summary metrics (project name, language, completion, confidence).",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10,
+              "description": "How many analyses to return."
+            },
+            "language": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Filter by detected language, e.g. TypeScript."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_analysis",
+        "title": "Get analysis details",
+        "description": "Fetch one saved analysis by id, including next steps, risks, issues, security issues, dependency audit and compliance checks.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The analysis id returned by list_analyses."
+            },
+            "include_code": {
+              "type": "boolean",
+              "default": false,
+              "description": "Include the analyzed source snapshot (can be very large)."
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "search_analyses",
+        "title": "Search analyses",
+        "description": "Search the signed-in user's analyses by project name, goal or current state text.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Text to search for."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10,
+              "description": "Maximum results to return."
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_security_report",
+        "title": "Get security report",
+        "description": "Aggregate security issues, dependency audit findings and compliance checks across the signed-in user's recent analyses.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "analysis_id": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Limit the report to one analysis. Omit to aggregate recent analyses."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 25,
+              "default": 5,
+              "description": "How many recent analyses to aggregate when analysis_id is omitted."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "delete_analysis",
+        "title": "Delete analysis",
+        "description": "Permanently delete one of the signed-in user's saved analyses by id.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The analysis id to delete."
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
